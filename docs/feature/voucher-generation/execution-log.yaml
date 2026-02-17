@@ -1,0 +1,28 @@
+events:
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 01-01
+  t: '2026-02-17T16:58:40Z'
+- d: 'NOT_APPLICABLE: project setup step has no acceptance test'
+  p: RED_ACCEPTANCE
+  s: SKIPPED
+  sid: 01-01
+  t: '2026-02-17T16:58:57Z'
+- d: 'NOT_APPLICABLE: project setup step has no unit test'
+  p: RED_UNIT
+  s: SKIPPED
+  sid: 01-01
+  t: '2026-02-17T16:59:02Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 01-01
+  t: '2026-02-17T17:06:28Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 01-01
+  t: '2026-02-17T17:08:44Z'
+project_id: voucher-generation
+schema_version: '3.0'
