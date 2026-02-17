@@ -69,5 +69,30 @@ events:
   s: EXECUTED
   sid: 01-03
   t: '2026-02-17T17:30:51Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 01-03
+  t: '2026-02-17T17:33:11Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 01-04
+  t: '2026-02-17T18:09:19Z'
+- d: 'NOT_APPLICABLE: adapter tested via unit tests per task context'
+  p: RED_ACCEPTANCE
+  s: SKIPPED
+  sid: 01-04
+  t: '2026-02-17T18:09:41Z'
+- d: PASS
+  p: RED_UNIT
+  s: EXECUTED
+  sid: 01-04
+  t: '2026-02-17T18:10:27Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 01-04
+  t: '2026-02-17T18:12:23Z'
 project_id: voucher-generation
 schema_version: '3.0'

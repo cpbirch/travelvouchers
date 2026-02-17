@@ -31,10 +31,10 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/voucher_merger"]
+packages = ["src/main/voucher_merger"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["src/tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v"
