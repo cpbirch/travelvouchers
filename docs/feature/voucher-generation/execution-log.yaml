@@ -49,5 +49,25 @@ events:
   s: EXECUTED
   sid: 01-02
   t: '2026-02-17T17:14:57Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 01-03
+  t: '2026-02-17T17:23:41Z'
+- d: 'NOT_APPLICABLE: ports are interfaces tested via adapter implementations'
+  p: RED_ACCEPTANCE
+  s: SKIPPED
+  sid: 01-03
+  t: '2026-02-17T17:24:01Z'
+- d: 'NOT_APPLICABLE: ports are interfaces with no implementation'
+  p: RED_UNIT
+  s: SKIPPED
+  sid: 01-03
+  t: '2026-02-17T17:24:12Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 01-03
+  t: '2026-02-17T17:30:51Z'
 project_id: voucher-generation
 schema_version: '3.0'
