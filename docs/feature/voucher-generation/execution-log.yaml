@@ -24,5 +24,30 @@ events:
   s: EXECUTED
   sid: 01-01
   t: '2026-02-17T17:08:44Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 01-02
+  t: '2026-02-17T17:10:25Z'
+- d: 'NOT_APPLICABLE: value objects tested via unit tests'
+  p: RED_ACCEPTANCE
+  s: SKIPPED
+  sid: 01-02
+  t: '2026-02-17T17:10:48Z'
+- d: PASS
+  p: RED_UNIT
+  s: EXECUTED
+  sid: 01-02
+  t: '2026-02-17T17:11:58Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 01-02
+  t: '2026-02-17T17:13:31Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 01-02
+  t: '2026-02-17T17:14:57Z'
 project_id: voucher-generation
 schema_version: '3.0'
