@@ -1,0 +1,29 @@
+# Acceptance Test Dependencies
+# These are the testing dependencies, separate from production requirements
+
+# Test Framework
+pytest>=7.0,<8.0
+
+# BDD Support
+pytest-bdd>=7.0,<8.0
+
+# HTTP Client for API testing
+httpx>=0.24,<0.30
+
+# FastAPI TestClient
+fastapi>=0.100,<0.200
+
+# Async support
+anyio>=3.0
+
+# HTML validation (for US-007 scenarios)
+html5lib>=1.1
+
+# PDF inspection (for US-006 scenarios)
+PyPDF2>=3.0,<4.0
+
+# Coverage reporting
+pytest-cov>=4.0
+
+# Test output formatting
+pytest-html>=4.0

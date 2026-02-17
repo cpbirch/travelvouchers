@@ -1,0 +1,194 @@
+# API Consumer Journey: Voucher Generation
+# Structured schema for tooling and validation
+
+journey:
+  id: voucher-generation
+  name: API Consumer Voucher Generation Journey
+  version: "1.0"
+
+  persona:
+    type: internal-service
+    name: Booking Service
+    context: Internal holiday booking system
+    motivation: Generate human-readable vouchers for customer-booked services
+
+  emotional_arc:
+    start: uncertain
+    middle: processing
+    end: confident
+    description: "Consumer moves from integration uncertainty to confident reliance"
+
+  trigger:
+    event: customer_books_service
+    actor: booking-service
+    precondition: "Booking confirmed, payment processed"
+
+  steps:
+    - id: request
+      name: Request Voucher Generation
+      actor: api-consumer
+      action: POST /vouchers
+      input:
+        template_id: string
+        booking_id: string
+        service_date: date
+        customer: CustomerData
+        service: ServiceData
+      output: http-response-pending
+      emotional_state: hopeful-cautious
+      failure_modes:
+        - network_timeout
+        - invalid_json
+
+    - id: validate
+      name: Validate Input
+      actor: voucher-merger
+      action: validate-request
+      input: voucher-request
+      output: validation-result
+      emotional_state: system-processing
+      failure_modes:
+        - template_not_found
+        - required_field_missing
+        - invalid_field_format
+
+    - id: load-template
+      name: Load Template
+      actor: voucher-merger
+      action: load-template-file
+      input: template_id
+      output: parsed-template
+      emotional_state: system-processing
+      failure_modes:
+        - template_corrupted
+        - template_syntax_error
+
+    - id: merge
+      name: Merge Data into Template
+      actor: voucher-merger
+      action: merge-data
+      input:
+        - parsed-template
+        - customer-data
+        - service-data
+        - booking-metadata
+      output: merged-document
+      emotional_state: system-processing
+      failure_modes:
+        - placeholder_not_found
+        - data_type_mismatch
+
+    - id: render
+      name: Render Output Formats
+      actor: voucher-merger
+      action: render-outputs
+      input: merged-document
+      output:
+        - pdf-binary
+        - html-string
+      emotional_state: system-processing
+      failure_modes:
+        - pdf_rendering_error
+        - font_not_found
+
+    - id: store
+      name: Store Voucher Files
+      actor: voucher-merger
+      action: store-voucher
+      input:
+        - pdf-binary
+        - html-string
+        - storage-path
+      output: storage-urls
+      emotional_state: system-processing
+      failure_modes:
+        - storage_unavailable
+        - permission_denied
+
+    - id: respond
+      name: Return Success Response
+      actor: voucher-merger
+      action: send-response
+      input:
+        - voucher-metadata
+        - storage-urls
+      output: http-201-created
+      emotional_state: confident
+      failure_modes: []
+
+  shared_artifacts:
+    - id: template_id
+      source: api-consumer
+      consumers: [validate, load-template]
+
+    - id: booking_id
+      source: api-consumer
+      consumers: [validate, merge, store, respond]
+
+    - id: service_date
+      source: api-consumer
+      consumers: [validate, merge, store, respond]
+
+    - id: customer_data
+      source: api-consumer
+      consumers: [validate, merge]
+
+    - id: service_data
+      source: api-consumer
+      consumers: [validate, merge]
+
+    - id: merged_document
+      source: merge
+      consumers: [render]
+
+    - id: storage_urls
+      source: store
+      consumers: [respond]
+
+  integration_points:
+    - name: template-registry
+      type: internal
+      description: "Source of template files and metadata"
+
+    - name: storage-service
+      type: internal
+      description: "Blob/file storage for generated vouchers"
+
+  data_schemas:
+    CustomerData:
+      required:
+        - first_name: string
+        - last_name: string
+      optional:
+        - title: string
+        - email: string
+        - phone: string
+
+    ServiceData:
+      required:
+        - name: string
+        - provider: string
+      optional:
+        - pickup_time: time
+        - pickup_location: string
+        - dropoff_location: string
+        - confirmation_code: string
+        - passengers: integer
+        - luggage_allowance: string
+        - notes: string
+
+  idempotency:
+    key: "booking_id + service_date"
+    behavior: "Return existing voucher without regeneration"
+    response_code_existing: 200
+    response_code_new: 201
+
+  quality_attributes:
+    - name: reliability
+      measure: "99.9% success rate for valid requests"
+
+    - name: latency
+      measure: "P95 < 2 seconds for voucher generation"
+
+    - name: idempotency
+      measure: "Duplicate requests return identical results"
