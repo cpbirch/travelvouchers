@@ -144,5 +144,30 @@ events:
   s: EXECUTED
   sid: 01-06
   t: '2026-02-17T18:42:02Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 01-06
+  t: '2026-02-17T18:43:15Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 01-07
+  t: '2026-02-17T18:44:26Z'
+- d: 'NOT_APPLICABLE: use case tested via REST API in step 01-08'
+  p: RED_ACCEPTANCE
+  s: SKIPPED
+  sid: 01-07
+  t: '2026-02-17T18:44:31Z'
+- d: PASS
+  p: RED_UNIT
+  s: EXECUTED
+  sid: 01-07
+  t: '2026-02-17T18:45:23Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 01-07
+  t: '2026-02-17T18:46:51Z'
 project_id: voucher-generation
 schema_version: '3.0'
