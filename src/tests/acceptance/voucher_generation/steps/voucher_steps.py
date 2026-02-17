@@ -14,12 +14,8 @@ import pytest
 from pytest_bdd import given, when, then, parsers, scenarios
 from .conftest import VoucherTestContext
 
-# Load all feature files for this step definition module
-scenarios('../walking_skeleton.feature')
-scenarios('../milestone_1_validation.feature')
-scenarios('../milestone_2_templates_and_merging.feature')
-scenarios('../milestone_3_output_generation.feature')
-scenarios('../milestone_4_robustness.feature')
+# Note: scenarios() calls moved to individual test modules (test_walking_skeleton.py, etc.)
+# to avoid loading features with syntax errors during walking skeleton development
 
 
 # =============================================================================
