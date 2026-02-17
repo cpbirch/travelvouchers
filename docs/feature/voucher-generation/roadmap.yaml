@@ -1,0 +1,328 @@
+version: "1.0"
+project_id: "voucher-generation"
+goal: "Implement voucher generation system with template merging and PDF/HTML output"
+validation:
+  status: "approved"
+  reviewed_by: "nw-software-crafter-reviewer"
+  reviewed_at: "2026-02-17T16:50:00Z"
+  findings:
+    - severity: "high"
+      step_id: "02-05"
+      issue: "Fixed: Changed depends_on from ['02-01'] to ['01-08']"
+      status: "resolved"
+    - severity: "medium"
+      step_id: "04-02"
+      issue: "Fixed: Clarified description as non-blocking validation"
+      status: "resolved"
+
+phases:
+  # =============================================================================
+  # PHASE 01: Walking Skeleton (US-001)
+  # Minimal end-to-end flow to validate architecture before building features
+  # =============================================================================
+  - phase_id: "01"
+    name: "Walking Skeleton"
+    description: "Minimal end-to-end flow to validate hexagonal architecture"
+    user_stories: ["US-001"]
+    steps:
+      - step_id: "01-01"
+        name: "Project Structure and Dependencies"
+        description: "Create Python project with FastAPI, pytest-bdd, and LibreOffice dependencies"
+        acceptance_criteria:
+          - "pyproject.toml defines all dependencies from technology stack"
+          - "Directory structure follows hexagonal architecture (domain/, application/, adapters/, ports/)"
+          - "pytest runs with zero errors (no tests yet)"
+        files_to_modify:
+          - "pyproject.toml"
+          - "src/voucher_merger/__init__.py"
+          - "src/voucher_merger/domain/__init__.py"
+          - "src/voucher_merger/application/__init__.py"
+          - "src/voucher_merger/adapters/__init__.py"
+          - "src/voucher_merger/ports/__init__.py"
+        depends_on: []
+        estimated_effort: "1h"
+
+      - step_id: "01-02"
+        name: "Domain Value Objects"
+        description: "Create minimal domain value objects for voucher generation request"
+        acceptance_criteria:
+          - "CustomerData value object accepts first_name, last_name (required) and title (optional)"
+          - "ServiceData value object accepts name, provider (required)"
+          - "BookingRef value object accepts booking_id, service_date"
+        files_to_modify:
+          - "src/voucher_merger/domain/value_objects.py"
+        depends_on: ["01-01"]
+        estimated_effort: "1h"
+
+      - step_id: "01-03"
+        name: "Port Interfaces"
+        description: "Define driven port interfaces for template loading, rendering, and storage"
+        acceptance_criteria:
+          - "TemplateRepository port defines find_by_id() returning template or None"
+          - "DocumentRenderer port defines render_pdf() accepting merged content"
+          - "VoucherStorage port defines store() returning URLs"
+        files_to_modify:
+          - "src/voucher_merger/ports/template_repository.py"
+          - "src/voucher_merger/ports/document_renderer.py"
+          - "src/voucher_merger/ports/voucher_storage.py"
+        depends_on: ["01-02"]
+        estimated_effort: "1h"
+
+      - step_id: "01-04"
+        name: "Hardcoded Template Adapter"
+        description: "Implement template repository returning hardcoded skeleton template"
+        acceptance_criteria:
+          - "Returns skeleton-template with placeholder {{customer.last_name}}"
+          - "Returns None for any other template_id"
+        files_to_modify:
+          - "src/voucher_merger/adapters/hardcoded_template_repository.py"
+          - "tests/fixtures/templates/skeleton-template.docx"
+        depends_on: ["01-03"]
+        estimated_effort: "1h"
+
+      - step_id: "01-05"
+        name: "LibreOffice PDF Renderer Adapter"
+        description: "Implement document renderer using LibreOffice headless for PDF generation"
+        acceptance_criteria:
+          - "Converts docx with merged content to PDF bytes"
+          - "PDF contains searchable text"
+        files_to_modify:
+          - "src/voucher_merger/adapters/libreoffice_renderer.py"
+        depends_on: ["01-03"]
+        estimated_effort: "2h"
+
+      - step_id: "01-06"
+        name: "Filesystem Storage Adapter"
+        description: "Implement voucher storage writing to local filesystem"
+        acceptance_criteria:
+          - "Stores PDF at /vouchers/{booking_id}/{service_date}/voucher.pdf"
+          - "Returns accessible file:// URL"
+        files_to_modify:
+          - "src/voucher_merger/adapters/filesystem_storage.py"
+        depends_on: ["01-03"]
+        estimated_effort: "1h"
+
+      - step_id: "01-07"
+        name: "Generate Voucher Use Case"
+        description: "Implement application use case orchestrating template load, merge, render, store"
+        acceptance_criteria:
+          - "Loads template via port, merges customer data, renders PDF, stores and returns URL"
+          - "Returns VoucherResponse with voucher_id, urls, generated_at"
+        files_to_modify:
+          - "src/voucher_merger/application/generate_voucher.py"
+        depends_on: ["01-04", "01-05", "01-06"]
+        estimated_effort: "2h"
+
+      - step_id: "01-08"
+        name: "REST API Endpoint"
+        description: "Implement POST /vouchers endpoint accepting request and returning 201"
+        acceptance_criteria:
+          - "POST /vouchers accepts template_id, booking_id, service_date, customer, service"
+          - "Returns 201 with voucher_id, urls.pdf, generated_at"
+          - "Walking skeleton acceptance tests pass (@us-001 @critical)"
+        files_to_modify:
+          - "src/voucher_merger/adapters/rest_api.py"
+          - "src/voucher_merger/main.py"
+          - "tests/acceptance/voucher_generation/conftest.py"
+          - "tests/acceptance/voucher_generation/test_walking_skeleton.py"
+        depends_on: ["01-07"]
+        estimated_effort: "2h"
+
+  # =============================================================================
+  # PHASE 02: Core Flow (US-002, US-004, US-005, US-010)
+  # Template loading, data merging, and request validation
+  # =============================================================================
+  - phase_id: "02"
+    name: "Core Flow"
+    description: "Template loading from registry and customer/service data merging"
+    user_stories: ["US-002", "US-004", "US-005", "US-010"]
+    steps:
+      - step_id: "02-01"
+        name: "Filesystem Template Repository"
+        description: "Load .docx and .odt templates from configurable directory"
+        acceptance_criteria:
+          - "Loads .docx files preserving formatting"
+          - "Loads .odt files preserving formatting"
+          - "Returns None with TEMPLATE_NOT_FOUND for missing templates"
+          - "Milestone 2 template loading tests pass (@us-002)"
+        files_to_modify:
+          - "src/voucher_merger/adapters/filesystem_template_repository.py"
+          - "tests/fixtures/templates/airport-transfer-v2.docx"
+          - "tests/fixtures/templates/sightseeing-tour-v1.odt"
+        depends_on: ["01-08"]
+        estimated_effort: "3h"
+
+      - step_id: "02-02"
+        name: "Template Placeholder Extraction"
+        description: "Extract {{placeholder}} tokens from loaded templates"
+        acceptance_criteria:
+          - "Identifies all {{customer.*}} placeholders"
+          - "Identifies all {{service.*}} placeholders"
+          - "Returns placeholder list for validation"
+        files_to_modify:
+          - "src/voucher_merger/domain/template.py"
+        depends_on: ["02-01"]
+        estimated_effort: "1h"
+
+      - step_id: "02-03"
+        name: "Customer Data Merging"
+        description: "Replace {{customer.*}} placeholders with customer values"
+        acceptance_criteria:
+          - "Replaces first_name, last_name, title, email, phone placeholders"
+          - "Missing optional fields render as empty string"
+          - "Special characters (O'Brien, umlauts) handled correctly"
+          - "Milestone 2 customer merge tests pass (@us-004)"
+        files_to_modify:
+          - "src/voucher_merger/domain/merge_context.py"
+          - "src/voucher_merger/domain/template_merger.py"
+        depends_on: ["02-02"]
+        estimated_effort: "2h"
+
+      - step_id: "02-04"
+        name: "Service Data Merging"
+        description: "Replace {{service.*}} placeholders with service values"
+        acceptance_criteria:
+          - "Replaces name, provider, pickup_time, pickup_location, etc."
+          - "Handles transfer-specific and tour-specific fields"
+          - "Missing optional fields render as empty string"
+          - "Milestone 2 service merge tests pass (@us-005)"
+        files_to_modify:
+          - "src/voucher_merger/domain/merge_context.py"
+          - "src/voucher_merger/domain/template_merger.py"
+        depends_on: ["02-03"]
+        estimated_effort: "2h"
+
+      - step_id: "02-05"
+        name: "Request Validation"
+        description: "Validate all request fields before processing with batch error reporting"
+        acceptance_criteria:
+          - "Validates required fields: template_id, booking_id, service_date, customer.first_name, customer.last_name, service.name, service.provider"
+          - "Returns all validation errors in single response"
+          - "Date format validated as ISO 8601 (YYYY-MM-DD)"
+          - "Milestone 1 validation tests pass (@us-010)"
+        files_to_modify:
+          - "src/voucher_merger/application/validators.py"
+          - "src/voucher_merger/adapters/rest_api.py"
+        depends_on: ["01-08"]
+        estimated_effort: "2h"
+
+  # =============================================================================
+  # PHASE 03: Output Generation (US-006, US-007, US-008)
+  # PDF/HTML generation with full formatting and storage
+  # =============================================================================
+  - phase_id: "03"
+    name: "Output Generation"
+    description: "Full PDF and HTML generation with storage and URL return"
+    user_stories: ["US-006", "US-007", "US-008"]
+    steps:
+      - step_id: "03-01"
+        name: "PDF Generation with Formatting"
+        description: "Generate PDF preserving tables, fonts, images, colors from template"
+        acceptance_criteria:
+          - "PDF preserves table structure from template"
+          - "PDF preserves bold, italic, and color formatting"
+          - "PDF embeds images from template"
+          - "PDF file size under 500KB for typical vouchers"
+          - "PDF contains searchable text"
+          - "Milestone 3 PDF tests pass (@us-006)"
+        files_to_modify:
+          - "src/voucher_merger/adapters/libreoffice_renderer.py"
+        depends_on: ["02-04"]
+        estimated_effort: "3h"
+
+      - step_id: "03-02"
+        name: "HTML Generation"
+        description: "Generate email-compatible HTML with inline CSS and embedded images"
+        acceptance_criteria:
+          - "HTML includes inline CSS (no external stylesheets)"
+          - "Images embedded as base64 data URIs"
+          - "HTML is valid HTML5"
+          - "No external resource URLs"
+          - "Milestone 3 HTML tests pass (@us-007)"
+        files_to_modify:
+          - "src/voucher_merger/adapters/libreoffice_renderer.py"
+          - "src/voucher_merger/ports/document_renderer.py"
+        depends_on: ["02-04"]
+        estimated_effort: "3h"
+
+      - step_id: "03-03"
+        name: "Storage with Both Formats"
+        description: "Store PDF and HTML at predictable paths, return accessible URLs"
+        acceptance_criteria:
+          - "PDF stored at /vouchers/{booking_id}/{service_date}/voucher.pdf"
+          - "HTML stored at /vouchers/{booking_id}/{service_date}/voucher.html"
+          - "Both URLs accessible and return correct content type"
+          - "Storage failure returns 503 with Retry-After header"
+          - "Milestone 3 storage tests pass (@us-008)"
+        files_to_modify:
+          - "src/voucher_merger/adapters/filesystem_storage.py"
+          - "src/voucher_merger/application/generate_voucher.py"
+        depends_on: ["03-01", "03-02"]
+        estimated_effort: "2h"
+
+  # =============================================================================
+  # PHASE 04: Robustness (US-003, US-009, US-011)
+  # Idempotency, placeholder validation, structured errors
+  # =============================================================================
+  - phase_id: "04"
+    name: "Robustness"
+    description: "Idempotency, template validation, and structured error responses"
+    user_stories: ["US-003", "US-009", "US-011"]
+    steps:
+      - step_id: "04-01"
+        name: "Idempotency Check"
+        description: "Return existing voucher for duplicate booking_id + service_date requests"
+        acceptance_criteria:
+          - "Duplicate request returns 200 with original voucher data"
+          - "Original generated_at timestamp preserved"
+          - "No new files written on duplicate"
+          - "Different dates = different vouchers (201)"
+          - "Different bookings same date = different vouchers (201)"
+          - "Milestone 4 idempotency tests pass (@us-009)"
+        files_to_modify:
+          - "src/voucher_merger/application/generate_voucher.py"
+          - "src/voucher_merger/ports/voucher_storage.py"
+          - "src/voucher_merger/adapters/filesystem_storage.py"
+        depends_on: ["03-03"]
+        estimated_effort: "2h"
+
+      - step_id: "04-02"
+        name: "Template Placeholder Validation"
+        description: "Validate extracted placeholders against known schema during generation. Warn on unknowns with typo suggestions. Non-blocking validation (generation proceeds with warnings)."
+        acceptance_criteria:
+          - "Unknown placeholders generate warning but allow generation"
+          - "Typo detection with 'Did you mean' suggestions (Levenshtein)"
+          - "Optional field usage generates warning"
+          - "Milestone 4 placeholder validation tests pass (@us-003)"
+        files_to_modify:
+          - "src/voucher_merger/domain/placeholder_validator.py"
+          - "src/voucher_merger/application/generate_voucher.py"
+        depends_on: ["02-02"]
+        estimated_effort: "2h"
+
+      - step_id: "04-03"
+        name: "Structured Error Responses"
+        description: "Consistent error JSON structure with correlation ID across all error types"
+        acceptance_criteria:
+          - "All errors include: error (code), message, correlation_id, details"
+          - "Validation errors include field-level details array"
+          - "503 errors include retry_after field and Retry-After header"
+          - "Correlation ID logged with all errors"
+          - "Milestone 4 structured error tests pass (@us-011)"
+        files_to_modify:
+          - "src/voucher_merger/adapters/error_handler.py"
+          - "src/voucher_merger/adapters/rest_api.py"
+        depends_on: ["02-05"]
+        estimated_effort: "2h"
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+# Total steps: 16
+# Total estimated effort: 31 hours (~4 days)
+#
+# Phase 01 (Walking Skeleton): 8 steps, 11h - validates architecture
+# Phase 02 (Core Flow): 5 steps, 10h - templates and merging
+# Phase 03 (Output Generation): 3 steps, 8h - PDF, HTML, storage
+# Phase 04 (Robustness): 3 steps, 6h - idempotency, validation, errors
+# =============================================================================
