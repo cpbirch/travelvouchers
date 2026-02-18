@@ -28,6 +28,7 @@ class VoucherTestContext:
     response_json: dict = field(default_factory=dict)
     available_templates: set = field(default_factory=set)
     storage_available: bool = True
+    captured_merged_content: str = ""  # Captures merged HTML for verification
 
 
 @pytest.fixture
@@ -56,6 +57,8 @@ def client(context: VoucherTestContext):
     # Mock document renderer (avoids LibreOffice dependency)
     class MockDocumentRenderer:
         def render_pdf(self, merged_content: MergedContent) -> RenderedDocument:
+            # Capture merged content for verification in then steps
+            context.captured_merged_content = merged_content.html
             return RenderedDocument(
                 content=b"%PDF-1.4\n" + merged_content.html.encode(),
                 filename="voucher.pdf",
@@ -105,6 +108,24 @@ def template_does_not_exist(context: VoucherTestContext, template_id: str):
     context.available_templates.discard(template_id)
 
 
+@given('the template with customer placeholders exists')
+def template_with_customer_placeholders(context: VoucherTestContext):
+    """Ensure a template with customer placeholders exists."""
+    context.available_templates.add("airport-transfer-v2")
+
+
+@given(parsers.parse('the template with "{placeholder_text}" exists'))
+def template_with_specific_placeholders(context: VoucherTestContext, placeholder_text: str):
+    """Ensure a template with specific placeholders exists."""
+    context.available_templates.add("airport-transfer-v2")
+
+
+@given('the template with customer name placeholders exists')
+def template_with_customer_name_placeholders(context: VoucherTestContext):
+    """Ensure a template with customer name placeholders exists."""
+    context.available_templates.add("airport-transfer-v2")
+
+
 @when('I request a voucher for:')
 def request_voucher_with_table(context: VoucherTestContext, datatable, client):
     """Build a voucher request from table data."""
@@ -127,6 +148,23 @@ def set_customer_with_title(context: VoucherTestContext, first_name: str, last_n
     context.customer_data["first_name"] = first_name
     context.customer_data["last_name"] = last_name
     context.customer_data["title"] = title
+
+
+@when(parsers.parse('customer "{first_name}" "{last_name}" with:'))
+def set_customer_with_table(context: VoucherTestContext, first_name: str, last_name: str, datatable):
+    """Set customer with additional data from table."""
+    context.customer_data["first_name"] = first_name
+    context.customer_data["last_name"] = last_name
+    for row in datatable[1:]:  # Skip header row
+        if len(row) >= 2:
+            context.customer_data[row[0]] = row[1]
+
+
+@when(parsers.parse('customer "{first_name}" "{last_name}" without title'))
+def set_customer_without_title(context: VoucherTestContext, first_name: str, last_name: str):
+    """Set customer without optional title."""
+    context.customer_data["first_name"] = first_name
+    context.customer_data["last_name"] = last_name
 
 
 @when(parsers.parse('service "{name}" provided by "{provider}"'))
@@ -182,6 +220,20 @@ def error_message_contains(context: VoucherTestContext, text: str):
     """Verify error message contains text."""
     message = context.response_json.get("message", "")
     assert text in message, f"Expected '{text}' in message: {message}"
+
+
+@then(parsers.parse('the PDF contains "{text}"'))
+def pdf_contains_text(context: VoucherTestContext, text: str):
+    """Verify the PDF content contains the expected text.
+
+    The mock renderer captures the merged HTML, which we check
+    to verify placeholder replacement worked correctly.
+    """
+    assert context.response is not None, "No response received"
+    assert context.response.status_code == 201, \
+        f"Voucher must be created first (got {context.response.status_code})"
+    assert text in context.captured_merged_content, \
+        f"Expected '{text}' in merged content, but got:\n{context.captured_merged_content[:500]}"
 
 
 # =============================================================================

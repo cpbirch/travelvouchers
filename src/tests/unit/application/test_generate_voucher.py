@@ -1,9 +1,11 @@
 """Unit tests for GenerateVoucher use case.
 
-Test Budget: 3 behaviors x 2 = 6 unit tests max
+Test Budget: 5 behaviors x 2 = 10 unit tests max
 - Behavior 1: Successful voucher generation (orchestrates load, merge, render, store)
 - Behavior 2: Template not found error
 - Behavior 3: Merge logic replaces placeholder correctly
+- Behavior 4: Customer placeholder merging (first_name, last_name, title, email, phone)
+- Behavior 5: Missing optional customer fields render as empty
 """
 
 from datetime import date, datetime
@@ -149,4 +151,184 @@ class TestGenerateVoucher:
         merged_content: MergedContent = call_args[0][0]
 
         assert "Smith" in merged_content.html
+        assert "{{customer.last_name}}" not in merged_content.html
+
+    @pytest.mark.parametrize(
+        "placeholder,field_value,customer_field",
+        [
+            ("{{customer.first_name}}", "James", "first_name"),
+            ("{{customer.last_name}}", "Morrison", "last_name"),
+            ("{{customer.title}}", "Mr", "title"),
+            ("{{customer.email}}", "j.morrison@email.com", "email"),
+            ("{{customer.phone}}", "+44 7700 900123", "phone"),
+        ],
+    )
+    def test_merges_customer_placeholders_into_template(
+        self, placeholder: str, field_value: str, customer_field: str
+    ) -> None:
+        """Use case replaces all customer placeholders with actual data."""
+        from voucher_merger.application.generate_voucher import (
+            GenerateVoucher,
+            GenerateVoucherRequest,
+        )
+
+        # Arrange
+        template_repo = Mock()
+        template_repo.find_by_id.return_value = Template(
+            template_id="test-template",
+            content=f"Customer: {placeholder}",
+        )
+
+        document_renderer = Mock()
+        document_renderer.render_pdf.return_value = RenderedDocument(
+            content=b"%PDF-1.4 test", filename="voucher.pdf"
+        )
+
+        voucher_storage = Mock()
+        voucher_storage.store.return_value = StorageUrl(
+            url="file:///vouchers/voucher.pdf"
+        )
+
+        use_case = GenerateVoucher(
+            template_repository=template_repo,
+            document_renderer=document_renderer,
+            voucher_storage=voucher_storage,
+        )
+
+        # Build customer data with optional fields
+        customer_kwargs = {
+            "first_name": "James",
+            "last_name": "Morrison",
+            "title": "Mr",
+            "email": "j.morrison@email.com",
+            "phone": "+44 7700 900123",
+        }
+        customer = CustomerData(**customer_kwargs)
+
+        request = GenerateVoucherRequest(
+            template_id="test-template",
+            booking=BookingRef(booking_id="B-12345", service_date=date(2026, 3, 15)),
+            customer=customer,
+            service=ServiceData(name="Transfer", provider="CityLink"),
+        )
+
+        # Act
+        use_case.execute(request)
+
+        # Assert - verify placeholder was replaced
+        document_renderer.render_pdf.assert_called_once()
+        call_args = document_renderer.render_pdf.call_args
+        merged_content: MergedContent = call_args[0][0]
+
+        assert field_value in merged_content.html
+        assert placeholder not in merged_content.html
+
+    def test_renders_missing_optional_fields_as_empty_string(self) -> None:
+        """Missing optional customer fields (title, email, phone) render as empty."""
+        from voucher_merger.application.generate_voucher import (
+            GenerateVoucher,
+            GenerateVoucherRequest,
+        )
+
+        # Arrange
+        template_repo = Mock()
+        template_repo.find_by_id.return_value = Template(
+            template_id="test-template",
+            content="Dear {{customer.title}} {{customer.last_name}}",
+        )
+
+        document_renderer = Mock()
+        document_renderer.render_pdf.return_value = RenderedDocument(
+            content=b"%PDF-1.4 test", filename="voucher.pdf"
+        )
+
+        voucher_storage = Mock()
+        voucher_storage.store.return_value = StorageUrl(
+            url="file:///vouchers/voucher.pdf"
+        )
+
+        use_case = GenerateVoucher(
+            template_repository=template_repo,
+            document_renderer=document_renderer,
+            voucher_storage=voucher_storage,
+        )
+
+        # Customer without optional title
+        customer = CustomerData(first_name="Elena", last_name="Rodriguez")
+
+        request = GenerateVoucherRequest(
+            template_id="test-template",
+            booking=BookingRef(booking_id="B-12345", service_date=date(2026, 3, 15)),
+            customer=customer,
+            service=ServiceData(name="Transfer", provider="CityLink"),
+        )
+
+        # Act
+        use_case.execute(request)
+
+        # Assert - title placeholder replaced with empty, last_name replaced
+        document_renderer.render_pdf.assert_called_once()
+        call_args = document_renderer.render_pdf.call_args
+        merged_content: MergedContent = call_args[0][0]
+
+        assert "Rodriguez" in merged_content.html
+        assert "{{customer.title}}" not in merged_content.html
+        assert "{{customer.last_name}}" not in merged_content.html
+
+    @pytest.mark.parametrize(
+        "last_name",
+        [
+            "O'Brien",       # Apostrophe
+            "Mueller",       # Umlaut-compatible (using ASCII)
+            "von der Berg",  # Spaces and lowercase
+        ],
+    )
+    def test_handles_special_characters_in_customer_names(self, last_name: str) -> None:
+        """Customer names with special characters are merged correctly."""
+        from voucher_merger.application.generate_voucher import (
+            GenerateVoucher,
+            GenerateVoucherRequest,
+        )
+
+        # Arrange
+        template_repo = Mock()
+        template_repo.find_by_id.return_value = Template(
+            template_id="test-template",
+            content="Customer: {{customer.last_name}}",
+        )
+
+        document_renderer = Mock()
+        document_renderer.render_pdf.return_value = RenderedDocument(
+            content=b"%PDF-1.4 test", filename="voucher.pdf"
+        )
+
+        voucher_storage = Mock()
+        voucher_storage.store.return_value = StorageUrl(
+            url="file:///vouchers/voucher.pdf"
+        )
+
+        use_case = GenerateVoucher(
+            template_repository=template_repo,
+            document_renderer=document_renderer,
+            voucher_storage=voucher_storage,
+        )
+
+        customer = CustomerData(first_name="Patrick", last_name=last_name)
+
+        request = GenerateVoucherRequest(
+            template_id="test-template",
+            booking=BookingRef(booking_id="B-12345", service_date=date(2026, 3, 15)),
+            customer=customer,
+            service=ServiceData(name="Transfer", provider="CityLink"),
+        )
+
+        # Act
+        use_case.execute(request)
+
+        # Assert - special characters preserved
+        document_renderer.render_pdf.assert_called_once()
+        call_args = document_renderer.render_pdf.call_args
+        merged_content: MergedContent = call_args[0][0]
+
+        assert last_name in merged_content.html
         assert "{{customer.last_name}}" not in merged_content.html

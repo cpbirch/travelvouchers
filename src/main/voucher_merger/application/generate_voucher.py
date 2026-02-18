@@ -128,7 +128,8 @@ class GenerateVoucher:
     ) -> str:
         """Merge request data into template placeholders.
 
-        For the walking skeleton, only {{customer.last_name}} is replaced.
+        Replaces all {{customer.*}} placeholders with customer data.
+        Missing optional fields are rendered as empty strings.
 
         Args:
             template_content: Raw template content with placeholders.
@@ -137,9 +138,21 @@ class GenerateVoucher:
         Returns:
             Merged content with placeholders replaced.
         """
-        merged = template_content.replace(
-            "{{customer.last_name}}", request.customer.last_name
-        )
+        customer = request.customer
+
+        # Build customer placeholder mappings
+        customer_placeholders = {
+            "{{customer.first_name}}": customer.first_name,
+            "{{customer.last_name}}": customer.last_name,
+            "{{customer.title}}": customer.title or "",
+            "{{customer.email}}": customer.email or "",
+            "{{customer.phone}}": customer.phone or "",
+        }
+
+        merged = template_content
+        for placeholder, value in customer_placeholders.items():
+            merged = merged.replace(placeholder, value)
+
         return merged
 
     def _generate_voucher_id(self, booking: BookingRef) -> str:

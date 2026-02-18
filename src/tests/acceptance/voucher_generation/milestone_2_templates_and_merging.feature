@@ -62,7 +62,7 @@ Feature: Template Loading and Data Merging
   # Sprint 2 - Core Flow
   # ============================================================================
 
-  @us-004 @skip
+  @us-004
   # James Morrison's full customer profile is merged into the template.
   # All customer placeholders are replaced with his data.
   Scenario: Merge complete customer data
@@ -82,7 +82,7 @@ Feature: Template Loading and Data Merging
     And the PDF contains "Mr Morrison"
     And the PDF contains "James"
 
-  @us-004 @skip
+  @us-004
   # Elena Rodriguez only provided required fields (no title).
   # The voucher generates successfully with title rendered as empty.
   Scenario: Merge customer data with missing optional title
@@ -97,7 +97,7 @@ Feature: Template Loading and Data Merging
     Then the voucher is created successfully
     And the PDF contains "Rodriguez"
 
-  @us-004 @skip
+  @us-004
   # Patrick O'Brien has an apostrophe in his last name.
   # The system must handle special characters correctly in both PDF and HTML.
   Scenario: Handle special characters in customer names
@@ -112,7 +112,7 @@ Feature: Template Loading and Data Merging
     Then the voucher is created successfully
     And the PDF contains "O'Brien"
 
-  @us-004 @skip
+  @us-004
   # Hans Muller (with umlaut) books a voucher.
   # International characters must render correctly.
   Scenario: Handle accented characters in customer names

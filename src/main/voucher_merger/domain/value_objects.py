@@ -12,11 +12,15 @@ class CustomerData:
         first_name: Customer's first name (required).
         last_name: Customer's last name (required).
         title: Optional title (e.g., "Mr.", "Dr.").
+        email: Optional email address.
+        phone: Optional phone number.
     """
 
     first_name: str
     last_name: str
     title: str | None = None
+    email: str | None = None
+    phone: str | None = None
 
 
 @dataclass(frozen=True)
