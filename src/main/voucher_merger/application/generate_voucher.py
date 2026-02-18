@@ -141,29 +141,7 @@ class GenerateVoucher:
         # 1. Check for existing voucher (idempotency)
         existing = self._voucher_storage.find_existing()
         if existing is not None:
-            # Return existing voucher metadata
-            # Handle both dict (from test fixtures) and VoucherMetadata (from real storage)
-            if isinstance(existing, dict):
-                return ExistingVoucherResponse(
-                    voucher_id=existing.get("voucher_id", ""),
-                    urls=VoucherUrls(
-                        pdf_url=existing.get("pdf_url", ""),
-                        html_url=existing.get("html_url"),
-                    ),
-                    generated_at=existing.get("generated_at", ""),
-                    is_existing=True,
-                )
-            else:
-                # VoucherMetadata dataclass
-                return ExistingVoucherResponse(
-                    voucher_id=existing.voucher_id,
-                    urls=VoucherUrls(
-                        pdf_url=existing.pdf_url,
-                        html_url=existing.html_url,
-                    ),
-                    generated_at=existing.generated_at,
-                    is_existing=True,
-                )
+            return self._build_existing_voucher_response(existing)
 
         # 2. Load template
         template = self._template_repository.find_by_id(request.template_id)
@@ -300,3 +278,37 @@ class GenerateVoucher:
         # Log warnings for optional field usage
         for warning in result.warnings:
             logger.warning("Template '%s': %s", template_id, warning)
+
+    def _build_existing_voucher_response(
+        self, existing: dict | object
+    ) -> ExistingVoucherResponse:
+        """Build response from existing voucher metadata.
+
+        Handles both dict (from test fixtures) and VoucherMetadata (from real storage).
+
+        Args:
+            existing: Existing voucher metadata as dict or VoucherMetadata.
+
+        Returns:
+            ExistingVoucherResponse with the voucher details.
+        """
+        if isinstance(existing, dict):
+            return ExistingVoucherResponse(
+                voucher_id=existing.get("voucher_id", ""),
+                urls=VoucherUrls(
+                    pdf_url=existing.get("pdf_url", ""),
+                    html_url=existing.get("html_url"),
+                ),
+                generated_at=existing.get("generated_at", ""),
+                is_existing=True,
+            )
+        # VoucherMetadata dataclass
+        return ExistingVoucherResponse(
+            voucher_id=existing.voucher_id,
+            urls=VoucherUrls(
+                pdf_url=existing.pdf_url,
+                html_url=existing.html_url,
+            ),
+            generated_at=existing.generated_at,
+            is_existing=True,
+        )

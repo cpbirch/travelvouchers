@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
-from voucher_merger.adapters.filesystem_storage import FilesystemStorage
 from voucher_merger.adapters.hardcoded_template_repository import (
     HardcodedTemplateRepository,
 )
 from voucher_merger.adapters.libreoffice_renderer import LibreOfficeRenderer
 from voucher_merger.adapters.rest_api import create_voucher_router
+from voucher_merger.adapters.storage_factory import StorageFactory
 from voucher_merger.application.generate_voucher import GenerateVoucher
 from voucher_merger.ports.document_renderer import DocumentRenderer
 from voucher_merger.ports.template_repository import TemplateRepository
@@ -62,44 +62,7 @@ def create_app(
 
     # For storage, we need to create a factory since FilesystemStorage
     # requires booking_id and service_date at construction time
-    # This is a temporary solution for the walking skeleton
-    # TODO: Refactor FilesystemStorage to not require these at construction
     storage_base_path = Path("/tmp/voucher-merger")
-
-    # Create a wrapper class that creates storage per-request
-    class StorageFactory:
-        """Factory for creating FilesystemStorage instances per request."""
-
-        def __init__(self, base_path: Path):
-            self._base_path = base_path
-            self._current_storage: Optional[FilesystemStorage] = None
-
-        def configure(self, booking_id: str, service_date: str) -> None:
-            """Configure storage for a specific booking."""
-            self._current_storage = FilesystemStorage(
-                base_path=self._base_path,
-                booking_id=booking_id,
-                service_date=service_date,
-            )
-
-        def find_existing(self):
-            """Check for existing voucher using the configured storage."""
-            if self._current_storage is None:
-                return None
-            return self._current_storage.find_existing()
-
-        def store(self, document):
-            """Store a document using the configured storage."""
-            if self._current_storage is None:
-                raise RuntimeError("Storage not configured. Call configure() first.")
-            return self._current_storage.store(document)
-
-        def store_html(self, document):
-            """Store HTML document using the configured storage."""
-            if self._current_storage is None:
-                raise RuntimeError("Storage not configured. Call configure() first.")
-            return self._current_storage.store_html(document)
-
     storage_factory = StorageFactory(storage_base_path)
 
     # For the walking skeleton, we need to hook into the request flow

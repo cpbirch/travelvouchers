@@ -36,6 +36,9 @@ class LibreOfficeRenderer:
     'libreoffice' command for this adapter to work.
     """
 
+    _CONVERSION_TIMEOUT_SECONDS = 60
+    _VOUCHER_ID_LENGTH = 8
+
     _SOFFICE_PATHS = [
         "soffice",
         "libreoffice",
@@ -89,7 +92,7 @@ class LibreOfficeRenderer:
             pdf_bytes = output_path.read_bytes()
             return RenderedDocument(
                 content=pdf_bytes,
-                filename=f"voucher_{uuid4().hex[:8]}.pdf",
+                filename=f"voucher_{uuid4().hex[:self._VOUCHER_ID_LENGTH]}.pdf",
             )
 
     def _run_conversion(self, input_path: Path, output_dir: str) -> None:
@@ -120,7 +123,7 @@ class LibreOfficeRenderer:
                 cmd,
                 check=True,
                 capture_output=True,
-                timeout=60,
+                timeout=self._CONVERSION_TIMEOUT_SECONDS,
             )
         except FileNotFoundError as e:
             raise LibreOfficeNotFoundError(
@@ -137,7 +140,7 @@ class LibreOfficeRenderer:
             ) from e
         except subprocess.TimeoutExpired as e:
             raise RenderingError(
-                "LibreOffice conversion timed out after 60 seconds."
+                f"LibreOffice conversion timed out after {self._CONVERSION_TIMEOUT_SECONDS} seconds."
             ) from e
 
     def _find_soffice(self) -> str:
@@ -180,7 +183,7 @@ class LibreOfficeRenderer:
 
         return RenderedHtmlDocument(
             content=html,
-            filename=f"voucher_{uuid4().hex[:8]}.html",
+            filename=f"voucher_{uuid4().hex[:self._VOUCHER_ID_LENGTH]}.html",
         )
 
     def _inline_css(self, html: str) -> str:

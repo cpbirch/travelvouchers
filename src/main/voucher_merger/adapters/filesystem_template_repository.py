@@ -4,7 +4,6 @@ from pathlib import Path
 
 from docx import Document
 from odf.opendocument import load as load_odt
-from odf.text import P, H, Span
 
 from voucher_merger.ports.template_repository import Template
 

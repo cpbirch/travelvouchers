@@ -86,6 +86,8 @@ class PlaceholderValidator:
     - Optional field usage - generates warning about potential empty values
     """
 
+    _MAX_SUGGESTION_EDIT_DISTANCE = 2
+
     def __init__(self) -> None:
         """Initialize validator with known schema."""
         self._known_placeholders = (
@@ -165,8 +167,8 @@ class PlaceholderValidator:
                 best_distance = distance
                 best_match = known_placeholder
 
-        # Only suggest if within reasonable edit distance (max 2)
-        if best_match and best_distance <= 2:
+        # Only suggest if within reasonable edit distance
+        if best_match and best_distance <= self._MAX_SUGGESTION_EDIT_DISTANCE:
             return best_match
 
         return None
