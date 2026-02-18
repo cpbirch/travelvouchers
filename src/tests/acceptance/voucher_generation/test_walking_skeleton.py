@@ -7,26 +7,17 @@ It validates the complete architecture from API endpoint to storage.
 
 import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
-from dataclasses import dataclass, field
-from typing import Any
 
 from fastapi.testclient import TestClient
 
+import sys
+from pathlib import Path
 
-# =============================================================================
-# Test Context
-# =============================================================================
+# Add parent directory to path for shared module access
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-@dataclass
-class VoucherTestContext:
-    """Holds state across Given-When-Then steps within a single scenario."""
-    request_data: dict = field(default_factory=dict)
-    customer_data: dict = field(default_factory=dict)
-    service_data: dict = field(default_factory=dict)
-    response: Any = None
-    response_json: dict = field(default_factory=dict)
-    available_templates: set = field(default_factory=set)
-    storage_available: bool = True
+from shared.contexts import VoucherTestContext
+from shared.constants import DEFAULT_PDF_URL, DEFAULT_HTML_URL
 
 
 @pytest.fixture
@@ -73,10 +64,10 @@ def client():
             return None
 
         def store(self, document: RenderedDocument) -> StorageUrl:
-            return StorageUrl(url="file:///vouchers/test/voucher.pdf")
+            return StorageUrl(url=DEFAULT_PDF_URL)
 
         def store_html(self, document: "RenderedHtmlDocument") -> StorageUrl:
-            return StorageUrl(url="file:///vouchers/test/voucher.html")
+            return StorageUrl(url=DEFAULT_HTML_URL)
 
     # Create use case with mocked adapters
     use_case = GenerateVoucher(
@@ -87,25 +78,6 @@ def client():
 
     app = create_app(generate_voucher=use_case)
     return TestClient(app)
-
-
-class MockTestClient:
-    """Mock client for when app is not yet implemented."""
-
-    def post(self, url: str, json: dict = None):
-        return MockResponse(501, {"error": "NOT_IMPLEMENTED"})
-
-
-class MockResponse:
-    """Mock HTTP response."""
-
-    def __init__(self, status_code: int, json_data: dict):
-        self.status_code = status_code
-        self._json = json_data
-        self.headers = {}
-
-    def json(self):
-        return self._json
 
 
 # =============================================================================
@@ -207,24 +179,6 @@ def response_contains_fields(context: VoucherTestContext, datatable):
             for part in parts:
                 assert part in value, f"Field '{field_name}' not in response: {context.response_json}"
                 value = value[part]
-
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-def _parse_table(table_str: str) -> dict:
-    """Parse a Gherkin table string into a dictionary."""
-    lines = [line.strip() for line in table_str.strip().split("\n") if line.strip()]
-    if not lines:
-        return {}
-
-    result = {}
-    for line in lines:
-        parts = [p.strip() for p in line.split("|") if p.strip()]
-        if len(parts) == 2:
-            result[parts[0]] = parts[1]
-    return result
 
 
 # =============================================================================

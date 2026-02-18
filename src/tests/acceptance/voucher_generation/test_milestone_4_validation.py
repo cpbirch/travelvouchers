@@ -9,22 +9,28 @@ This module tests placeholder validation through the domain layer, verifying tha
 - Valid placeholders pass without warnings
 """
 
-import pytest
-from dataclasses import dataclass, field
-from typing import Any
-from pathlib import Path
 import logging
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
+import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
+
+# Add parent directory to path for shared module access
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from shared.mocks import InMemoryTemplateRepository
 
 
 # =============================================================================
-# Test Context
+# Test Context - Extended for validation testing
 # =============================================================================
 
 @dataclass
-class ValidationTestContext:
-    """Holds state across Given-When-Then steps within a single scenario."""
+class PlaceholderValidationContext:
+    """Holds state for placeholder validation scenarios."""
     template_id: str = ""
     template_content: str = ""
     request_data: dict = field(default_factory=dict)
@@ -38,32 +44,9 @@ class ValidationTestContext:
 
 
 @pytest.fixture
-def context() -> ValidationTestContext:
+def context() -> PlaceholderValidationContext:
     """Fresh test context for each scenario."""
-    return ValidationTestContext()
-
-
-# =============================================================================
-# Custom Template Repository for Testing
-# =============================================================================
-
-class InMemoryTemplateRepository:
-    """In-memory template repository for validation testing."""
-
-    def __init__(self) -> None:
-        self._templates: dict[str, str] = {}
-
-    def add_template(self, template_id: str, content: str) -> None:
-        """Add a template with given content."""
-        self._templates[template_id] = content
-
-    def find_by_id(self, template_id: str):
-        """Find template by ID."""
-        from voucher_merger.ports.template_repository import Template
-        content = self._templates.get(template_id)
-        if content is None:
-            return None
-        return Template(template_id=template_id, content=content)
+    return PlaceholderValidationContext()
 
 
 # =============================================================================
@@ -77,7 +60,7 @@ def storage_base_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def template_repo(context: ValidationTestContext) -> InMemoryTemplateRepository:
+def template_repo(context: PlaceholderValidationContext) -> InMemoryTemplateRepository:
     """Create in-memory template repository."""
     repo = InMemoryTemplateRepository()
     context.template_repo = repo
@@ -85,7 +68,7 @@ def template_repo(context: ValidationTestContext) -> InMemoryTemplateRepository:
 
 
 @pytest.fixture
-def client(context: ValidationTestContext, storage_base_path: Path, template_repo: InMemoryTemplateRepository):
+def client(context: PlaceholderValidationContext, storage_base_path: Path, template_repo: InMemoryTemplateRepository):
     """Create TestClient for the FastAPI application with validation support."""
     from voucher_merger.main import create_app
     from voucher_merger.application.generate_voucher import GenerateVoucher
@@ -162,7 +145,7 @@ def client(context: ValidationTestContext, storage_base_path: Path, template_rep
 # =============================================================================
 
 @given('the airport transfer template exists')
-def airport_transfer_template_exists(context: ValidationTestContext, template_repo: InMemoryTemplateRepository):
+def airport_transfer_template_exists(context: PlaceholderValidationContext, template_repo: InMemoryTemplateRepository):
     """Ensure the airport transfer template is available."""
     template_repo.add_template(
         "airport-transfer-v2",
@@ -171,14 +154,14 @@ def airport_transfer_template_exists(context: ValidationTestContext, template_re
 
 
 @given('the storage service is available')
-def storage_available(context: ValidationTestContext):
+def storage_available(context: PlaceholderValidationContext):
     """Ensure storage is operational."""
     pass
 
 
 @given(parsers.parse('the template "{template_id}" contains "{content}"'))
 def template_contains_content(
-    context: ValidationTestContext,
+    context: PlaceholderValidationContext,
     template_id: str,
     content: str,
     template_repo: InMemoryTemplateRepository
@@ -191,7 +174,7 @@ def template_contains_content(
 
 @given(parsers.parse('the template "{template_id}" contains only known placeholders:'))
 def template_with_known_placeholders(
-    context: ValidationTestContext,
+    context: PlaceholderValidationContext,
     template_id: str,
     datatable,
     template_repo: InMemoryTemplateRepository
@@ -214,7 +197,7 @@ def template_with_known_placeholders(
 # =============================================================================
 
 @when('I request a voucher for:')
-def request_voucher_with_table(context: ValidationTestContext, datatable):
+def request_voucher_with_table(context: PlaceholderValidationContext, datatable):
     """Build a voucher request from table data."""
     for row in datatable[1:]:  # Skip header row
         if len(row) >= 2:
@@ -222,7 +205,7 @@ def request_voucher_with_table(context: ValidationTestContext, datatable):
 
 
 @when(parsers.parse('customer "{first_name}" "{last_name}"'))
-def set_customer_data(context: ValidationTestContext, first_name: str, last_name: str):
+def set_customer_data(context: PlaceholderValidationContext, first_name: str, last_name: str):
     """Set customer first and last name."""
     context.customer_data["first_name"] = first_name
     context.customer_data["last_name"] = last_name
@@ -230,7 +213,7 @@ def set_customer_data(context: ValidationTestContext, first_name: str, last_name
 
 @when(parsers.parse('service "{name}" provided by "{provider}"'))
 def set_service_and_execute(
-    context: ValidationTestContext,
+    context: PlaceholderValidationContext,
     name: str,
     provider: str,
     client,
@@ -256,7 +239,7 @@ def set_service_and_execute(
 
 
 @when(parsers.parse('the template "{template_id}" is validated'))
-def validate_template(context: ValidationTestContext, template_id: str, template_repo: InMemoryTemplateRepository):
+def validate_template(context: PlaceholderValidationContext, template_id: str, template_repo: InMemoryTemplateRepository):
     """Validate a template against the placeholder schema."""
     from voucher_merger.domain.placeholder_validator import PlaceholderValidator
     from voucher_merger.domain.template import TemplatePlaceholderExtractor
@@ -277,7 +260,7 @@ def validate_template(context: ValidationTestContext, template_id: str, template
 # =============================================================================
 
 @then('the voucher is created successfully')
-def voucher_created_successfully(context: ValidationTestContext):
+def voucher_created_successfully(context: PlaceholderValidationContext):
     """Verify voucher creation succeeded with 201."""
     assert context.response is not None, "No response received"
     assert context.response.status_code == 201, \
@@ -285,7 +268,7 @@ def voucher_created_successfully(context: ValidationTestContext):
 
 
 @then(parsers.parse('a warning is logged about unknown placeholder "{placeholder}"'))
-def warning_logged_for_unknown_placeholder(context: ValidationTestContext, placeholder: str):
+def warning_logged_for_unknown_placeholder(context: PlaceholderValidationContext, placeholder: str):
     """Verify a warning was logged about the unknown placeholder."""
     warning_messages = [
         record.message for record in context.captured_logs
@@ -302,7 +285,7 @@ def warning_logged_for_unknown_placeholder(context: ValidationTestContext, place
 
 
 @then(parsers.parse('validation reports unknown placeholder "{placeholder}"'))
-def validation_reports_unknown(context: ValidationTestContext, placeholder: str):
+def validation_reports_unknown(context: PlaceholderValidationContext, placeholder: str):
     """Verify validation reports the placeholder as unknown."""
     assert context.validation_result is not None, "No validation result"
 
@@ -312,7 +295,7 @@ def validation_reports_unknown(context: ValidationTestContext, placeholder: str)
 
 
 @then(parsers.parse('validation suggests "Did you mean: {suggestion}?"'))
-def validation_suggests(context: ValidationTestContext, suggestion: str):
+def validation_suggests(context: PlaceholderValidationContext, suggestion: str):
     """Verify validation suggests the correct placeholder."""
     assert context.validation_result is not None, "No validation result"
 
@@ -327,7 +310,7 @@ def validation_suggests(context: ValidationTestContext, suggestion: str):
 
 
 @then('validation passes with no errors')
-def validation_passes(context: ValidationTestContext):
+def validation_passes(context: PlaceholderValidationContext):
     """Verify validation passes without errors."""
     assert context.validation_result is not None, "No validation result"
     assert context.validation_result.is_valid, \
@@ -337,7 +320,7 @@ def validation_passes(context: ValidationTestContext):
 
 
 @then('validation passes')
-def validation_passes_with_warnings(context: ValidationTestContext):
+def validation_passes_with_warnings(context: PlaceholderValidationContext):
     """Verify validation passes (may have warnings)."""
     assert context.validation_result is not None, "No validation result"
     assert context.validation_result.is_valid, \
@@ -345,7 +328,7 @@ def validation_passes_with_warnings(context: ValidationTestContext):
 
 
 @then(parsers.parse('validation warns "{warning}"'))
-def validation_warns(context: ValidationTestContext, warning: str):
+def validation_warns(context: PlaceholderValidationContext, warning: str):
     """Verify validation includes a warning."""
     assert context.validation_result is not None, "No validation result"
 

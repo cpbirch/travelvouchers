@@ -1,4 +1,10 @@
-"""Unit tests for FilesystemStorage adapter."""
+"""Unit tests for FilesystemStorage adapter.
+
+Test Budget: 3 behaviors x 2 = 6 tests max
+- Behavior 1: Store PDF at correct path structure
+- Behavior 2: Store HTML at correct path structure
+- Behavior 3: Handle filesystem write failures
+"""
 
 from pathlib import Path
 
@@ -6,6 +12,12 @@ import pytest
 
 from voucher_merger.ports.document_renderer import RenderedDocument, RenderedHtmlDocument
 from voucher_merger.ports.voucher_storage import StorageUrl
+
+# Test constants
+TEST_BOOKING_ID = "BK-12345"
+TEST_SERVICE_DATE = "2026-03-15"
+TEST_PDF_CONTENT = b"%PDF-1.4 test content"
+TEST_HTML_CONTENT = "<!DOCTYPE html><html><body>Test</body></html>"
 
 
 class TestFilesystemStorage:
@@ -17,19 +29,18 @@ class TestFilesystemStorage:
 
         storage = FilesystemStorage(
             base_path=tmp_path,
-            booking_id="BK-12345",
-            service_date="2026-03-15",
+            booking_id=TEST_BOOKING_ID,
+            service_date=TEST_SERVICE_DATE,
         )
-        pdf_content = b"%PDF-1.4 test content"
-        document = RenderedDocument(content=pdf_content, filename="voucher.pdf")
+        document = RenderedDocument(content=TEST_PDF_CONTENT, filename="voucher.pdf")
 
         storage.store(document)
 
         expected_path = (
-            tmp_path / "vouchers" / "BK-12345" / "2026-03-15" / "voucher.pdf"
+            tmp_path / "vouchers" / TEST_BOOKING_ID / TEST_SERVICE_DATE / "voucher.pdf"
         )
         assert expected_path.exists()
-        assert expected_path.read_bytes() == b"%PDF-1.4 test content"
+        assert expected_path.read_bytes() == TEST_PDF_CONTENT
 
     def test_returns_file_url_for_stored_document(self, tmp_path: Path) -> None:
         """store() returns StorageUrl with file:// URL pointing to stored file."""
@@ -76,19 +87,18 @@ class TestFilesystemStorage:
 
         storage = FilesystemStorage(
             base_path=tmp_path,
-            booking_id="BK-12345",
-            service_date="2026-03-15",
+            booking_id=TEST_BOOKING_ID,
+            service_date=TEST_SERVICE_DATE,
         )
-        html_content = "<!DOCTYPE html><html><body>Test</body></html>"
-        document = RenderedHtmlDocument(content=html_content, filename="voucher.html")
+        document = RenderedHtmlDocument(content=TEST_HTML_CONTENT, filename="voucher.html")
 
         storage.store_html(document)
 
         expected_path = (
-            tmp_path / "vouchers" / "BK-12345" / "2026-03-15" / "voucher.html"
+            tmp_path / "vouchers" / TEST_BOOKING_ID / TEST_SERVICE_DATE / "voucher.html"
         )
         assert expected_path.exists()
-        assert expected_path.read_text(encoding="utf-8") == html_content
+        assert expected_path.read_text(encoding="utf-8") == TEST_HTML_CONTENT
 
     def test_returns_file_url_for_stored_html_document(self, tmp_path: Path) -> None:
         """store_html() returns StorageUrl with file:// URL pointing to stored HTML."""

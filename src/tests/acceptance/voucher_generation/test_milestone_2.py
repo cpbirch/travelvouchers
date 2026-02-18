@@ -5,30 +5,19 @@ This module runs the milestone 2 acceptance tests through the REST API.
 It validates template loading from filesystem (.docx and .odt formats).
 """
 
-import pytest
+import sys
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Any
+
+import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 
 from fastapi.testclient import TestClient
 
+# Add parent directory to path for shared module access
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# =============================================================================
-# Test Context
-# =============================================================================
-
-@dataclass
-class VoucherTestContext:
-    """Holds state across Given-When-Then steps within a single scenario."""
-    request_data: dict = field(default_factory=dict)
-    customer_data: dict = field(default_factory=dict)
-    service_data: dict = field(default_factory=dict)
-    response: Any = None
-    response_json: dict = field(default_factory=dict)
-    available_templates: set = field(default_factory=set)
-    storage_available: bool = True
-    captured_merged_content: str = ""  # Captures merged HTML for verification
+from shared.contexts import VoucherTestContext
+from shared.constants import DEFAULT_PDF_URL, DEFAULT_HTML_URL
 
 
 @pytest.fixture
@@ -78,10 +67,10 @@ def client(context: VoucherTestContext):
             return None
 
         def store(self, document: RenderedDocument) -> StorageUrl:
-            return StorageUrl(url="file:///vouchers/test/voucher.pdf")
+            return StorageUrl(url=DEFAULT_PDF_URL)
 
         def store_html(self, document: "RenderedHtmlDocument") -> StorageUrl:
-            return StorageUrl(url="file:///vouchers/test/voucher.html")
+            return StorageUrl(url=DEFAULT_HTML_URL)
 
     # Create use case with real template repository, mocked adapters
     use_case = GenerateVoucher(

@@ -8,33 +8,18 @@ This module tests storage functionality through the REST API, verifying that:
 - Storage failures return 503 with Retry-After header
 """
 
-import pytest
+import sys
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Any
+
+import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 
 from fastapi.testclient import TestClient
 
+# Add parent directory to path for shared module access
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# =============================================================================
-# Test Context
-# =============================================================================
-
-@dataclass
-class VoucherTestContext:
-    """Holds state across Given-When-Then steps within a single scenario."""
-    request_data: dict = field(default_factory=dict)
-    customer_data: dict = field(default_factory=dict)
-    service_data: dict = field(default_factory=dict)
-    response: Any = None
-    response_json: dict = field(default_factory=dict)
-    available_templates: set = field(default_factory=set)
-    storage_available: bool = True
-    stored_pdf_path: str = ""
-    stored_html_path: str = ""
-    pdf_content: bytes = b""
-    html_content: str = ""
+from shared.contexts import VoucherTestContext
 
 
 @pytest.fixture

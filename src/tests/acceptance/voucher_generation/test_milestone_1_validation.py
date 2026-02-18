@@ -5,36 +5,19 @@ This module runs the milestone 1 validation acceptance tests through the REST AP
 It validates request field validation with batch error reporting.
 """
 
-import pytest
+import sys
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Any, Optional
+
+import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 
 from fastapi.testclient import TestClient
 
+# Add parent directory to path for shared module access
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# =============================================================================
-# Test Context
-# =============================================================================
-
-@dataclass
-class ValidationTestContext:
-    """Holds state across Given-When-Then steps within a single scenario."""
-    request_data: dict = field(default_factory=dict)
-    customer_data: dict = field(default_factory=dict)
-    service_data: dict = field(default_factory=dict)
-    response: Any = None
-    response_json: dict = field(default_factory=dict)
-    available_templates: set = field(default_factory=set)
-    storage_available: bool = True
-    # Flags for intentional missing fields
-    skip_template_id: bool = False
-    skip_booking_id: bool = False
-    skip_customer_first_name: bool = False
-    skip_customer_last_name: bool = False
-    skip_service_name: bool = False
-    skip_service_provider: bool = False
+from shared.contexts import ValidationTestContext
+from shared.constants import DEFAULT_PDF_URL
 
 
 @pytest.fixture
@@ -70,7 +53,7 @@ def client(context: ValidationTestContext):
     # Mock storage (avoids filesystem dependency)
     class MockVoucherStorage:
         def store(self, document: RenderedDocument) -> StorageUrl:
-            return StorageUrl(url="file:///vouchers/test/voucher.pdf")
+            return StorageUrl(url=DEFAULT_PDF_URL)
 
     # Create use case with mocked adapters
     use_case = GenerateVoucher(

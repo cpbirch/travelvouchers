@@ -9,29 +9,19 @@ This module tests structured error response functionality through the REST API, 
 - Correlation ID is logged with all errors
 """
 
-import pytest
 import logging
+import sys
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Any
+
+import pytest
 from pytest_bdd import given, when, then, parsers, scenario
 
+# Add parent directory to path for shared module access
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# =============================================================================
-# Test Context
-# =============================================================================
-
-@dataclass
-class ErrorTestContext:
-    """Holds state across Given-When-Then steps within a single scenario."""
-    request_data: dict = field(default_factory=dict)
-    customer_data: dict = field(default_factory=dict)
-    service_data: dict = field(default_factory=dict)
-    response: Any = None
-    response_json: dict = field(default_factory=dict)
-    storage_available: bool = True
-    template_corrupted: bool = False
-    captured_logs: list = field(default_factory=list)
+from shared.contexts import ErrorTestContext
+from shared.mocks import InMemoryTemplateRepository
+from shared.constants import AIRPORT_TRANSFER_TEMPLATE_ID
 
 
 @pytest.fixture
@@ -50,41 +40,13 @@ def storage_base_path(tmp_path: Path) -> Path:
     return tmp_path
 
 
-class InMemoryTemplateRepository:
-    """In-memory template repository for error testing."""
-
-    def __init__(self) -> None:
-        self._templates: dict[str, str] = {}
-        self._corrupted: set[str] = set()
-
-    def add_template(self, template_id: str, content: str) -> None:
-        """Add a template with given content."""
-        self._templates[template_id] = content
-
-    def mark_corrupted(self, template_id: str) -> None:
-        """Mark a template as corrupted."""
-        self._corrupted.add(template_id)
-
-    def find_by_id(self, template_id: str):
-        """Find template by ID."""
-        from voucher_merger.ports.template_repository import Template
-
-        if template_id in self._corrupted:
-            raise ValueError(f"Template '{template_id}' is corrupted")
-
-        content = self._templates.get(template_id)
-        if content is None:
-            return None
-        return Template(template_id=template_id, content=content)
-
-
 @pytest.fixture
 def template_repo(context: ErrorTestContext) -> InMemoryTemplateRepository:
     """Create in-memory template repository."""
     repo = InMemoryTemplateRepository()
     # Add standard templates
     repo.add_template(
-        "airport-transfer-v2",
+        AIRPORT_TRANSFER_TEMPLATE_ID,
         "<p>Dear {{customer.first_name}} {{customer.last_name}}, your transfer is confirmed.</p>"
     )
     context.template_repo = repo

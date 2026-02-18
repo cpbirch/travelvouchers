@@ -9,35 +9,20 @@ This module tests idempotency functionality through the REST API, verifying that
 - Different booking_id or service_date creates new vouchers
 """
 
-import pytest
+import json
+import sys
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Any
-from datetime import datetime
+
+import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 
 from fastapi.testclient import TestClient
 
+# Add parent directory to path for shared module access
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# =============================================================================
-# Test Context
-# =============================================================================
-
-@dataclass
-class VoucherTestContext:
-    """Holds state across Given-When-Then steps within a single scenario."""
-    request_data: dict = field(default_factory=dict)
-    customer_data: dict = field(default_factory=dict)
-    service_data: dict = field(default_factory=dict)
-    response: Any = None
-    response_json: dict = field(default_factory=dict)
-    available_templates: set = field(default_factory=set)
-    storage_available: bool = True
-    existing_vouchers: dict = field(default_factory=dict)
-    original_voucher_id: str = ""
-    original_generated_at: str = ""
-    files_before_request: set = field(default_factory=set)
-    files_after_request: set = field(default_factory=set)
+from shared.contexts import VoucherTestContext
+from shared.constants import AIRPORT_TRANSFER_TEMPLATE_ID
 
 
 @pytest.fixture
