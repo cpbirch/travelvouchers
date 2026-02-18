@@ -40,9 +40,11 @@ class VoucherUrls:
 
     Attributes:
         pdf_url: URL to the PDF version of the voucher.
+        html_url: URL to the HTML version of the voucher.
     """
 
     pdf_url: str
+    html_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -112,14 +114,21 @@ class GenerateVoucher:
         # 3. Render to PDF
         rendered_document = self._document_renderer.render_pdf(merged_content)
 
-        # 4. Store voucher
-        storage_url = self._voucher_storage.store(rendered_document)
+        # 4. Render to email-compatible HTML
+        rendered_html = self._document_renderer.render_html(merged_content)
 
-        # 5. Build and return response
+        # 5. Store vouchers (PDF and HTML)
+        pdf_storage_url = self._voucher_storage.store(rendered_document)
+        html_storage_url = self._voucher_storage.store_html(rendered_html)
+
+        # 6. Build and return response
         voucher_id = self._generate_voucher_id(request.booking)
         return VoucherResponse(
             voucher_id=voucher_id,
-            urls=VoucherUrls(pdf_url=storage_url.url),
+            urls=VoucherUrls(
+                pdf_url=pdf_storage_url.url,
+                html_url=html_storage_url.url,
+            ),
             generated_at=datetime.now(UTC),
         )
 

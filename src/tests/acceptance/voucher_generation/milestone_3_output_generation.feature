@@ -98,7 +98,7 @@ Feature: Output Generation and Storage
   # Sprint 3 - Output Generation
   # ============================================================================
 
-  @us-007 @skip
+  @us-007
   Scenario: Generate email-compatible HTML
     # Elena Rodriguez receives her voucher by email.
     # The HTML must render correctly in Gmail, Outlook, and Apple Mail.

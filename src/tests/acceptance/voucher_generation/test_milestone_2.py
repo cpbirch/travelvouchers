@@ -64,10 +64,20 @@ def client(context: VoucherTestContext):
                 filename="voucher.pdf",
             )
 
+        def render_html(self, merged_content: MergedContent) -> "RenderedHtmlDocument":
+            from voucher_merger.ports.document_renderer import RenderedHtmlDocument
+            return RenderedHtmlDocument(
+                content=f"<html><body>{merged_content.html}</body></html>",
+                filename="voucher.html",
+            )
+
     # Mock storage (avoids filesystem dependency)
     class MockVoucherStorage:
         def store(self, document: RenderedDocument) -> StorageUrl:
             return StorageUrl(url="file:///vouchers/test/voucher.pdf")
+
+        def store_html(self, document: "RenderedHtmlDocument") -> StorageUrl:
+            return StorageUrl(url="file:///vouchers/test/voucher.html")
 
     # Create use case with real template repository, mocked adapters
     use_case = GenerateVoucher(

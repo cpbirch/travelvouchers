@@ -28,12 +28,25 @@ class RenderedDocument:
     filename: str
 
 
+@dataclass(frozen=True)
+class RenderedHtmlDocument:
+    """Rendered HTML document for email compatibility.
+
+    Attributes:
+        content: The HTML content as string with inline CSS.
+        filename: Suggested filename for the document.
+    """
+
+    content: str
+    filename: str
+
+
 class DocumentRenderer(Protocol):
-    """Driven port for rendering documents to PDF.
+    """Driven port for rendering documents to PDF and HTML.
 
     This port defines the contract for converting merged HTML content
-    into PDF documents. Adapters implementing this port may use various
-    PDF generation libraries (WeasyPrint, wkhtmltopdf, etc.).
+    into PDF and email-compatible HTML documents. Adapters implementing
+    this port may use various libraries (LibreOffice, WeasyPrint, etc.).
     """
 
     def render_pdf(self, merged_content: MergedContent) -> RenderedDocument:
@@ -47,5 +60,22 @@ class DocumentRenderer(Protocol):
 
         Raises:
             RenderingError: If the content cannot be rendered to PDF.
+        """
+        ...
+
+    def render_html(self, merged_content: MergedContent) -> RenderedHtmlDocument:
+        """Render merged content to email-compatible HTML.
+
+        Generates HTML with inline CSS (no external stylesheets) and
+        embedded images as base64 data URIs for email compatibility.
+
+        Args:
+            merged_content: The merged HTML content to render.
+
+        Returns:
+            The rendered HTML document with inline styles.
+
+        Raises:
+            RenderingError: If the content cannot be rendered to HTML.
         """
         ...

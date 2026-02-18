@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from voucher_merger.ports.document_renderer import RenderedDocument
+from voucher_merger.ports.document_renderer import RenderedDocument, RenderedHtmlDocument
 from voucher_merger.ports.voucher_storage import StorageUrl
 
 
@@ -51,5 +51,28 @@ class FilesystemStorage:
 
         file_path = storage_dir / "voucher.pdf"
         file_path.write_bytes(document.content)
+
+        return StorageUrl(url=f"file://{file_path}")
+
+    def store_html(self, document: RenderedHtmlDocument) -> StorageUrl:
+        """Store a rendered HTML voucher document on the filesystem.
+
+        Creates the directory structure /vouchers/{booking_id}/{service_date}/
+        if it doesn't exist, writes the HTML content to voucher.html, and
+        returns a file:// URL pointing to the stored file.
+
+        Args:
+            document: The rendered HTML document to store.
+
+        Returns:
+            StorageUrl with file:// URL to the stored document.
+        """
+        storage_dir = (
+            self._base_path / "vouchers" / self._booking_id / self._service_date
+        )
+        storage_dir.mkdir(parents=True, exist_ok=True)
+
+        file_path = storage_dir / "voucher.html"
+        file_path.write_text(document.content, encoding="utf-8")
 
         return StorageUrl(url=f"file://{file_path}")

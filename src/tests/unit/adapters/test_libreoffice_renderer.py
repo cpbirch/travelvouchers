@@ -161,3 +161,92 @@ class TestLibreOfficeRenderer:
             # Content preserved
             assert "CityLink Transfers Ltd" in written_html
             assert "Heathrow Terminal 5" in written_html
+
+
+class TestLibreOfficeRendererHtmlGeneration:
+    """Tests for LibreOfficeRenderer HTML generation.
+
+    Test Budget: 2 behaviors x 2 = 4 unit tests max
+    - Behavior 1: Generates email-compatible HTML with inline CSS
+    - Behavior 2: Embeds images as base64 data URIs
+    """
+
+    def test_renders_html_with_inline_css(self) -> None:
+        """render_html returns RenderedHtmlDocument with inline CSS.
+
+        Step 03-02: HTML generation must use inline styles for email compatibility.
+        External stylesheets are blocked by most email clients.
+        """
+        from voucher_merger.ports.document_renderer import RenderedHtmlDocument
+
+        # HTML with external stylesheet references
+        merged_content = MergedContent(
+            html="""<html>
+<head>
+<style>
+    .provider { font-weight: bold; color: #003366; }
+    table { border-collapse: collapse; }
+</style>
+</head>
+<body>
+    <div class="provider">CityLink Transfers Ltd</div>
+    <table><tr><td>Service Details</td></tr></table>
+</body>
+</html>"""
+        )
+
+        renderer = LibreOfficeRenderer()
+        result = renderer.render_html(merged_content)
+
+        # Verify result type
+        assert isinstance(result, RenderedHtmlDocument)
+        assert result.filename.endswith(".html")
+
+        # Verify inline CSS (style attributes present)
+        html_content = result.content
+        assert 'style="' in html_content, "HTML should contain inline style attributes"
+
+        # Verify no external stylesheet links
+        assert '<link' not in html_content.lower() or 'stylesheet' not in html_content.lower(), \
+            "HTML should not contain external stylesheet links"
+
+        # Verify valid HTML5 structure
+        assert '<!DOCTYPE html>' in html_content or '<!doctype html>' in html_content.lower()
+
+    def test_embeds_images_as_base64_data_uris(self) -> None:
+        """render_html embeds images as base64 data URIs.
+
+        Step 03-02: Images must be embedded for offline viewing and email compatibility.
+        External image URLs are typically blocked by email clients.
+        """
+        from voucher_merger.ports.document_renderer import RenderedHtmlDocument
+
+        # HTML with an external image reference
+        merged_content = MergedContent(
+            html="""<html>
+<body>
+    <img src="images/logo.png" alt="Company Logo">
+    <p>Welcome to our service</p>
+</body>
+</html>"""
+        )
+
+        renderer = LibreOfficeRenderer()
+        result = renderer.render_html(merged_content)
+
+        assert isinstance(result, RenderedHtmlDocument)
+
+        html_content = result.content
+
+        # Verify no external image URLs remain
+        import re
+        external_img_urls = re.findall(r'src=["\']https?://', html_content)
+        file_img_urls = re.findall(r'src=["\']images/', html_content)
+        assert len(external_img_urls) == 0, "Should not contain external image URLs"
+        assert len(file_img_urls) == 0, "Should not contain file path image URLs"
+
+        # If images exist, they should use data: URIs or be removed
+        img_tags = re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', html_content)
+        for src in img_tags:
+            assert src.startswith('data:image/') or src == '', \
+                f"Image src should be base64 data URI, got: {src}"

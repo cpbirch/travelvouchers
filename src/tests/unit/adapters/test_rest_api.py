@@ -31,7 +31,10 @@ class TestVoucherEndpoint:
         mock = Mock()
         mock.execute.return_value = Mock(
             voucher_id="V-BK-2024-00001-20240101",
-            urls=Mock(pdf_url="file:///vouchers/BK-2024-00001/2024-01-01/voucher.pdf"),
+            urls=Mock(
+                pdf_url="file:///vouchers/BK-2024-00001/2024-01-01/voucher.pdf",
+                html_url="file:///vouchers/BK-2024-00001/2024-01-01/voucher.html",
+            ),
             generated_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
         )
         return mock

@@ -62,6 +62,7 @@ class UrlsResponse(BaseModel):
     """URLs in the API response."""
 
     pdf: str = Field(..., description="URL to the generated PDF")
+    html: Optional[str] = Field(None, description="URL to the generated HTML")
 
 
 class VoucherApiResponse(BaseModel):
@@ -217,7 +218,10 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
             service_date=request_data["service_date"],
             template_id=request_data["template_id"],
             generated_at=result.generated_at.isoformat(),
-            urls=UrlsResponse(pdf=result.urls.pdf_url),
+            urls=UrlsResponse(
+                pdf=result.urls.pdf_url,
+                html=result.urls.html_url,
+            ),
         )
 
     return router

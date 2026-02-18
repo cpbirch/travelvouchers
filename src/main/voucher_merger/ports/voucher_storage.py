@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from voucher_merger.ports.document_renderer import RenderedDocument
+from voucher_merger.ports.document_renderer import RenderedDocument, RenderedHtmlDocument
 
 
 @dataclass(frozen=True)
@@ -32,6 +32,20 @@ class VoucherStorage(Protocol):
 
         Args:
             document: The rendered PDF document to store.
+
+        Returns:
+            The URL where the stored document can be accessed.
+
+        Raises:
+            StorageError: If the document cannot be stored.
+        """
+        ...
+
+    def store_html(self, document: RenderedHtmlDocument) -> StorageUrl:
+        """Store a rendered HTML voucher document.
+
+        Args:
+            document: The rendered HTML document to store.
 
         Returns:
             The URL where the stored document can be accessed.
