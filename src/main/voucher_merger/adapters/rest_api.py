@@ -8,10 +8,12 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from voucher_merger.application.generate_voucher import (
     GenerateVoucher,
     GenerateVoucherRequest,
+    TemplateNotFoundError,
     VoucherResponse,
 )
 from voucher_merger.domain.value_objects import BookingRef, CustomerData, ServiceData
@@ -61,6 +63,13 @@ class VoucherApiResponse(BaseModel):
     template_id: str = Field(..., description="Template used for generation")
     generated_at: str = Field(..., description="ISO timestamp of generation")
     urls: UrlsResponse = Field(..., description="URLs to access the voucher")
+
+
+class ErrorResponse(BaseModel):
+    """Error response body."""
+
+    error: str = Field(..., description="Error code")
+    message: str = Field(..., description="Human-readable error message")
 
 
 # =============================================================================
@@ -122,7 +131,16 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
         )
 
         # Execute use case
-        result: VoucherResponse = generate_voucher.execute(use_case_request)
+        try:
+            result: VoucherResponse = generate_voucher.execute(use_case_request)
+        except TemplateNotFoundError as e:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={
+                    "error": "TEMPLATE_NOT_FOUND",
+                    "message": f"Template '{e.template_id}' not found",
+                },
+            )
 
         # Format response
         return VoucherApiResponse(

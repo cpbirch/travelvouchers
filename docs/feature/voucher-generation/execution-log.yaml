@@ -199,5 +199,25 @@ events:
   s: EXECUTED
   sid: 01-08
   t: '2026-02-17T19:04:22Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 02-01
+  t: '2026-02-18T05:34:53Z'
+- d: PASS
+  p: RED_ACCEPTANCE
+  s: EXECUTED
+  sid: 02-01
+  t: '2026-02-18T05:37:52Z'
+- d: PASS
+  p: RED_UNIT
+  s: EXECUTED
+  sid: 02-01
+  t: '2026-02-18T05:38:26Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 02-01
+  t: '2026-02-18T05:42:31Z'
 project_id: voucher-generation
 schema_version: '3.0'

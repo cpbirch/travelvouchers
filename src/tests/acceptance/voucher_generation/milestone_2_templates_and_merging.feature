@@ -12,12 +12,10 @@ Feature: Template Loading and Data Merging
   # Sprint 2 - Core Flow
   # ============================================================================
 
-  @us-002 @skip
+  @us-002
+  # The system loads .docx files created by marketing in Microsoft Word.
+  # James Morrison is booking an airport transfer using the standard template.
   Scenario: Load Word template successfully
-    """
-    The system loads .docx files created by marketing in Microsoft Word.
-    James Morrison is booking an airport transfer using the standard template.
-    """
     Given the template "airport-transfer-v2" exists as a Word document
     When I request a voucher for:
       | field        | value               |
@@ -29,12 +27,10 @@ Feature: Template Loading and Data Merging
     Then the voucher is created successfully
     And the PDF preserves the template formatting
 
-  @us-002 @skip
+  @us-002
+  # The system also supports .odt files created in LibreOffice.
+  # Elena Rodriguez is booking a sightseeing tour using the Barcelona office template.
   Scenario: Load LibreOffice template successfully
-    """
-    The system also supports .odt files created in LibreOffice.
-    Elena Rodriguez is booking a sightseeing tour using the Barcelona office template.
-    """
     Given the template "sightseeing-tour-v1" exists as a LibreOffice document
     When I request a voucher for:
       | field        | value               |
@@ -45,12 +41,10 @@ Feature: Template Loading and Data Merging
     And service "London Eye and Thames Cruise" provided by "City Sightseeing London"
     Then the voucher is created successfully
 
-  @us-002 @skip
+  @us-002
+  # When a booking service requests a non-existent template,
+  # they receive a clear 404 error with the template name.
   Scenario: Template not found returns clear error
-    """
-    When a booking service requests a non-existent template,
-    they receive a clear 404 error with the template name.
-    """
     Given the template "old-template-2019" does not exist
     When I request a voucher for:
       | field        | value            |
@@ -69,11 +63,9 @@ Feature: Template Loading and Data Merging
   # ============================================================================
 
   @us-004 @skip
+  # James Morrison's full customer profile is merged into the template.
+  # All customer placeholders are replaced with his data.
   Scenario: Merge complete customer data
-    """
-    James Morrison's full customer profile is merged into the template.
-    All customer placeholders are replaced with his data.
-    """
     Given the template with customer placeholders exists
     When I request a voucher for:
       | field        | value               |
@@ -91,11 +83,9 @@ Feature: Template Loading and Data Merging
     And the PDF contains "James"
 
   @us-004 @skip
+  # Elena Rodriguez only provided required fields (no title).
+  # The voucher generates successfully with title rendered as empty.
   Scenario: Merge customer data with missing optional title
-    """
-    Elena Rodriguez only provided required fields (no title).
-    The voucher generates successfully with title rendered as empty.
-    """
     Given the template with "Dear {{customer.title}} {{customer.last_name}}" exists
     When I request a voucher for:
       | field        | value               |
@@ -108,11 +98,9 @@ Feature: Template Loading and Data Merging
     And the PDF contains "Rodriguez"
 
   @us-004 @skip
+  # Patrick O'Brien has an apostrophe in his last name.
+  # The system must handle special characters correctly in both PDF and HTML.
   Scenario: Handle special characters in customer names
-    """
-    Patrick O'Brien has an apostrophe in his last name.
-    The system must handle special characters correctly in both PDF and HTML.
-    """
     Given the template with customer name placeholders exists
     When I request a voucher for:
       | field        | value               |
@@ -125,11 +113,9 @@ Feature: Template Loading and Data Merging
     And the PDF contains "O'Brien"
 
   @us-004 @skip
+  # Hans Muller (with umlaut) books a voucher.
+  # International characters must render correctly.
   Scenario: Handle accented characters in customer names
-    """
-    Hans Muller (with umlaut) books a voucher.
-    International characters must render correctly.
-    """
     Given the template with customer name placeholders exists
     When I request a voucher for:
       | field        | value               |
@@ -147,11 +133,9 @@ Feature: Template Loading and Data Merging
   # ============================================================================
 
   @us-005 @skip
+  # James Morrison's airport transfer includes pickup/dropoff details.
+  # All transfer-specific fields merge into the template.
   Scenario: Merge airport transfer service data
-    """
-    James Morrison's airport transfer includes pickup/dropoff details.
-    All transfer-specific fields merge into the template.
-    """
     Given the template "airport-transfer-v2" exists with service placeholders
     When I request a voucher for:
       | field        | value               |
@@ -175,11 +159,9 @@ Feature: Template Loading and Data Merging
     And the PDF contains "CLT-78432-HRW"
 
   @us-005 @skip
+  # Elena Rodriguez's tour voucher uses different fields (meeting_point, tour_time).
+  # The same merge logic handles different service types.
   Scenario: Merge sightseeing tour service data
-    """
-    Elena Rodriguez's tour voucher uses different fields (meeting_point, tour_time).
-    The same merge logic handles different service types.
-    """
     Given the template "sightseeing-tour-v1" exists with tour placeholders
     When I request a voucher for:
       | field        | value               |
@@ -200,11 +182,9 @@ Feature: Template Loading and Data Merging
     And the PDF contains "10:00"
 
   @us-005 @skip
+  # A minimal service booking with only required fields (name, provider).
+  # Optional fields render as empty without errors.
   Scenario: Handle missing optional service fields
-    """
-    A minimal service booking with only required fields (name, provider).
-    Optional fields render as empty without errors.
-    """
     Given the template with optional service placeholders exists
     When I request a voucher for:
       | field        | value               |
@@ -216,10 +196,8 @@ Feature: Template Loading and Data Merging
     Then the voucher is created successfully
 
   @us-005 @skip
+  # The notes field can contain special requirements like accessibility needs.
   Scenario: Service data with special notes merged correctly
-    """
-    The notes field can contain special requirements like accessibility needs.
-    """
     Given the template with service notes placeholder exists
     When I request a voucher for:
       | field        | value               |

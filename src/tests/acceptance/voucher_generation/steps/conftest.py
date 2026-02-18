@@ -358,8 +358,5 @@ class MockResponse:
 # Pytest-BDD Configuration
 # =============================================================================
 
-def pytest_bdd_step_error(request, feature, scenario, step, step_func, step_func_args, exception):
-    """Enhanced error reporting for BDD step failures."""
-    print(f"\nStep failed: {step}")
-    print(f"Scenario: {scenario.name}")
-    print(f"Feature: {feature.name}")
+# Note: pytest_bdd_step_error hook removed as it's not available in pytest-bdd 7.x
+# BDD step failures are reported through standard pytest error reporting
