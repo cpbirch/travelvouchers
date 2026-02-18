@@ -137,7 +137,7 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
 
   # All validation errors follow the same JSON structure for
   # programmatic handling by the booking service.
-  @us-011 @skip
+  @us-011
   Scenario: Validation error has consistent structure
     When I request a voucher with missing customer last_name
     Then the response status is 400 Bad Request
@@ -149,7 +149,7 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
       | details        | array  |
 
   # 404 errors also follow the standard error structure.
-  @us-011 @skip
+  @us-011
   Scenario: Template not found error has consistent structure
     When I request a voucher with template_id "non-existent"
     Then the response status is 404 Not Found
@@ -160,7 +160,7 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
 
   # 503 errors include retry_after so the booking service knows
   # when to retry the request.
-  @us-011 @skip
+  @us-011
   Scenario: Storage error includes retry guidance
     Given the storage service is temporarily unavailable
     When I request a voucher for:
@@ -176,7 +176,7 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
 
   # Every error response includes a correlation_id that support
   # can use to find related log entries.
-  @us-011 @skip
+  @us-011
   Scenario: All error responses include correlation ID
     When I request a voucher with invalid data
     Then the error response contains a correlation_id
@@ -184,7 +184,7 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
 
   # If a template file is corrupted (invalid DOCX/ODT), the error
   # response identifies it as a template problem.
-  @us-011 @skip
+  @us-011
   Scenario: Corrupted template returns 500 with error details
     Given the template "corrupted-template" exists but is corrupted
     When I request a voucher for:
@@ -200,7 +200,7 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
 
   # Error messages should be understandable by developers without
   # looking up error codes.
-  @us-011 @skip
+  @us-011
   Scenario: Error message is human-readable
     When I request a voucher with service_date "invalid-date"
     Then the response status is 400 Bad Request

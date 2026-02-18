@@ -343,7 +343,7 @@ def response_status_matches(context: ValidationTestContext, status_code: int, st
 @then(parsers.parse('the error response contains {count:d} validation errors'))
 def error_response_contains_count(context: ValidationTestContext, count: int):
     """Verify the number of validation errors in response."""
-    errors = context.response_json.get("errors", [])
+    errors = context.response_json.get("details", [])
     assert len(errors) == count, \
         f"Expected {count} validation errors, got {len(errors)}: {errors}"
 
@@ -351,7 +351,7 @@ def error_response_contains_count(context: ValidationTestContext, count: int):
 @then(parsers.parse('error for "{field}" has code "{code}"'))
 def error_for_field_has_code(context: ValidationTestContext, field: str, code: str):
     """Verify a specific field has a specific error code."""
-    errors = context.response_json.get("errors", [])
+    errors = context.response_json.get("details", [])
     matching_error = None
     for error in errors:
         if error.get("field") == field:
@@ -374,7 +374,7 @@ def error_code_matches(context: ValidationTestContext, error_code: str):
 @then(parsers.parse('the error details include field "{field}"'))
 def error_details_include_field(context: ValidationTestContext, field: str):
     """Verify that a specific field is mentioned in validation errors."""
-    errors = context.response_json.get("errors", [])
+    errors = context.response_json.get("details", [])
     field_found = any(error.get("field") == field for error in errors)
     assert field_found, \
         f"Field '{field}' not found in validation errors: {errors}"
@@ -385,7 +385,7 @@ def error_message_mentions(context: ValidationTestContext, text: str):
     """Verify the error message contains specific text."""
     message = context.response_json.get("message", "")
     # Also check in individual error messages
-    errors = context.response_json.get("errors", [])
+    errors = context.response_json.get("details", [])
     error_messages = [e.get("message", "") for e in errors]
     all_messages = message + " " + " ".join(error_messages)
 
@@ -396,7 +396,7 @@ def error_message_mentions(context: ValidationTestContext, text: str):
 @then('the error response contains validation errors for required fields')
 def error_response_contains_required_fields(context: ValidationTestContext):
     """Verify that all required fields are mentioned in validation errors."""
-    errors = context.response_json.get("errors", [])
+    errors = context.response_json.get("details", [])
     required_fields = ["template_id", "booking_id", "service_date",
                        "customer.first_name", "customer.last_name",
                        "service.name", "service.provider"]

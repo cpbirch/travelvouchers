@@ -161,7 +161,7 @@ class TestVoucherEndpointValidation:
         assert response.status_code == 400
         data = response.json()
         assert data["error"] == "VALIDATION_FAILED"
-        error_fields = [e["field"] for e in data["errors"]]
+        error_fields = [e["field"] for e in data["details"]]
         assert expected_field in error_fields
 
     @pytest.mark.parametrize("missing_customer_field,expected_field", [
@@ -189,7 +189,7 @@ class TestVoucherEndpointValidation:
         assert response.status_code == 400
         data = response.json()
         assert data["error"] == "VALIDATION_FAILED"
-        error_fields = [e["field"] for e in data["errors"]]
+        error_fields = [e["field"] for e in data["details"]]
         assert expected_field in error_fields
 
     @pytest.mark.parametrize("missing_service_field,expected_field", [
@@ -217,7 +217,7 @@ class TestVoucherEndpointValidation:
         assert response.status_code == 400
         data = response.json()
         assert data["error"] == "VALIDATION_FAILED"
-        error_fields = [e["field"] for e in data["errors"]]
+        error_fields = [e["field"] for e in data["details"]]
         assert expected_field in error_fields
 
     @pytest.mark.parametrize("invalid_date", [
@@ -245,7 +245,7 @@ class TestVoucherEndpointValidation:
 
         # Find the date validation error
         date_error = next(
-            (e for e in data["errors"] if e["field"] == "service_date"),
+            (e for e in data["details"] if e["field"] == "service_date"),
             None
         )
         assert date_error is not None
@@ -271,10 +271,10 @@ class TestVoucherEndpointValidation:
         assert data["error"] == "VALIDATION_FAILED"
 
         # Should contain errors for both fields
-        error_fields = [e["field"] for e in data["errors"]]
+        error_fields = [e["field"] for e in data["details"]]
         assert "customer.last_name" in error_fields
         assert "service_date" in error_fields
-        assert len(data["errors"]) >= 2
+        assert len(data["details"]) >= 2
 
     def test_returns_all_required_field_errors_for_empty_request(self, client):
         """POST /vouchers returns errors for all required fields on empty request."""
@@ -285,7 +285,7 @@ class TestVoucherEndpointValidation:
         assert data["error"] == "VALIDATION_FAILED"
 
         # Should contain errors for all required fields
-        error_fields = [e["field"] for e in data["errors"]]
+        error_fields = [e["field"] for e in data["details"]]
         required_fields = [
             "template_id", "booking_id", "service_date",
             "customer.first_name", "customer.last_name",
@@ -293,3 +293,185 @@ class TestVoucherEndpointValidation:
         ]
         for field in required_fields:
             assert field in error_fields, f"Missing error for required field: {field}"
+
+
+class TestStructuredErrorResponses:
+    """Tests for structured error response format (step 04-03).
+
+    Test Budget: 4 behaviors x 2 = 8 unit tests max
+    1. All errors include: error, message, correlation_id, details
+    2. Validation errors include field-level details array
+    3. 503 errors include retry_after field and Retry-After header
+    4. Correlation ID logged with all errors
+    """
+
+    @pytest.fixture
+    def mock_generate_voucher(self):
+        """Mock GenerateVoucher use case."""
+        mock = Mock()
+        mock.execute.return_value = Mock(
+            voucher_id="V-BK-2024-00001-20240101",
+            urls=Mock(pdf_url="file:///vouchers/BK-2024-00001/2024-01-01/voucher.pdf"),
+            generated_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
+        )
+        return mock
+
+    @pytest.fixture
+    def client(self, mock_generate_voucher):
+        """Create test client with mocked use case."""
+        from voucher_merger.main import create_app
+
+        app = create_app(generate_voucher=mock_generate_voucher)
+        return TestClient(app)
+
+    def test_validation_error_includes_correlation_id(self, client):
+        """Validation errors include correlation_id field."""
+        response = client.post(
+            "/vouchers",
+            json={
+                "template_id": "airport-transfer-v2",
+                "booking_id": "BK-2024-00001",
+                "service_date": "2024-01-01",
+                "customer": {"first_name": "James"},  # Missing last_name
+                "service": {"name": "Airport Transfer", "provider": "CityLink"},
+            },
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "correlation_id" in data
+        assert isinstance(data["correlation_id"], str)
+        assert len(data["correlation_id"]) > 0
+
+    def test_validation_error_includes_details_array(self, client):
+        """Validation errors include details array with field-level errors."""
+        response = client.post(
+            "/vouchers",
+            json={
+                "template_id": "airport-transfer-v2",
+                "booking_id": "BK-2024-00001",
+                "service_date": "2024-01-01",
+                "customer": {"first_name": "James"},  # Missing last_name
+                "service": {"name": "Airport Transfer", "provider": "CityLink"},
+            },
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "details" in data
+        assert isinstance(data["details"], list)
+        assert len(data["details"]) > 0
+        # Each detail should have field, code, message
+        for detail in data["details"]:
+            assert "field" in detail
+            assert "code" in detail
+            assert "message" in detail
+
+    def test_404_error_includes_correlation_id(self, client, mock_generate_voucher):
+        """404 errors include correlation_id field."""
+        from voucher_merger.application.generate_voucher import TemplateNotFoundError
+
+        mock_generate_voucher.execute.side_effect = TemplateNotFoundError("non-existent")
+
+        response = client.post(
+            "/vouchers",
+            json={
+                "template_id": "non-existent",
+                "booking_id": "BK-2024-00001",
+                "service_date": "2024-01-01",
+                "customer": {"first_name": "James", "last_name": "Morrison"},
+                "service": {"name": "Airport Transfer", "provider": "CityLink"},
+            },
+        )
+
+        assert response.status_code == 404
+        data = response.json()
+        assert "correlation_id" in data
+        assert isinstance(data["correlation_id"], str)
+
+    def test_503_error_includes_retry_after_field(self, client, mock_generate_voucher):
+        """503 errors include retry_after field as integer."""
+        from voucher_merger.ports.voucher_storage import StorageError
+
+        mock_generate_voucher.execute.side_effect = StorageError("Storage unavailable")
+
+        response = client.post(
+            "/vouchers",
+            json={
+                "template_id": "airport-transfer-v2",
+                "booking_id": "BK-2024-00001",
+                "service_date": "2024-01-01",
+                "customer": {"first_name": "James", "last_name": "Morrison"},
+                "service": {"name": "Airport Transfer", "provider": "CityLink"},
+            },
+        )
+
+        assert response.status_code == 503
+        data = response.json()
+        assert "retry_after" in data
+        assert isinstance(data["retry_after"], int)
+        assert data["retry_after"] > 0
+
+    def test_503_error_includes_retry_after_header(self, client, mock_generate_voucher):
+        """503 errors include Retry-After header."""
+        from voucher_merger.ports.voucher_storage import StorageError
+
+        mock_generate_voucher.execute.side_effect = StorageError("Storage unavailable")
+
+        response = client.post(
+            "/vouchers",
+            json={
+                "template_id": "airport-transfer-v2",
+                "booking_id": "BK-2024-00001",
+                "service_date": "2024-01-01",
+                "customer": {"first_name": "James", "last_name": "Morrison"},
+                "service": {"name": "Airport Transfer", "provider": "CityLink"},
+            },
+        )
+
+        assert response.status_code == 503
+        assert "Retry-After" in response.headers
+        # Header value should be an integer in string form
+        assert response.headers["Retry-After"].isdigit()
+
+    def test_503_error_includes_correlation_id(self, client, mock_generate_voucher):
+        """503 errors include correlation_id field."""
+        from voucher_merger.ports.voucher_storage import StorageError
+
+        mock_generate_voucher.execute.side_effect = StorageError("Storage unavailable")
+
+        response = client.post(
+            "/vouchers",
+            json={
+                "template_id": "airport-transfer-v2",
+                "booking_id": "BK-2024-00001",
+                "service_date": "2024-01-01",
+                "customer": {"first_name": "James", "last_name": "Morrison"},
+                "service": {"name": "Airport Transfer", "provider": "CityLink"},
+            },
+        )
+
+        assert response.status_code == 503
+        data = response.json()
+        assert "correlation_id" in data
+        assert isinstance(data["correlation_id"], str)
+
+    def test_500_error_for_template_processing_error(self, client, mock_generate_voucher):
+        """Template processing errors return 500 with TEMPLATE_ERROR code."""
+        mock_generate_voucher.execute.side_effect = ValueError("Template is corrupted")
+
+        response = client.post(
+            "/vouchers",
+            json={
+                "template_id": "corrupted-template",
+                "booking_id": "BK-2024-00001",
+                "service_date": "2024-01-01",
+                "customer": {"first_name": "James", "last_name": "Morrison"},
+                "service": {"name": "Test Service", "provider": "Test Provider"},
+            },
+        )
+
+        assert response.status_code == 500
+        data = response.json()
+        assert data["error"] == "TEMPLATE_ERROR"
+        assert "correlation_id" in data

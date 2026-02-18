@@ -4,6 +4,8 @@ This module provides the FastAPI router for the voucher generation endpoint.
 It translates HTTP requests to use case calls and formats responses.
 """
 
+import logging
+import uuid
 from datetime import date
 from typing import Any, Optional
 
@@ -20,6 +22,16 @@ from voucher_merger.application.generate_voucher import (
 from voucher_merger.application.validators import validate_voucher_request
 from voucher_merger.domain.value_objects import BookingRef, CustomerData, ServiceData
 from voucher_merger.ports.voucher_storage import StorageError
+
+logger = logging.getLogger(__name__)
+
+# Default retry-after value in seconds for 503 responses
+DEFAULT_RETRY_AFTER_SECONDS = 60
+
+
+def generate_correlation_id() -> str:
+    """Generate a unique correlation ID for error tracking."""
+    return str(uuid.uuid4())
 
 # =============================================================================
 # Request/Response Models
@@ -91,7 +103,8 @@ class ValidationErrorResponse(BaseModel):
 
     error: str = Field(..., description="Error code (VALIDATION_FAILED)")
     message: str = Field(..., description="Human-readable summary message")
-    errors: list[ErrorDetail] = Field(..., description="List of validation errors")
+    correlation_id: str = Field(..., description="Unique ID for error tracking")
+    details: list[ErrorDetail] = Field(..., description="List of validation errors")
 
 
 class ErrorResponse(BaseModel):
@@ -99,6 +112,16 @@ class ErrorResponse(BaseModel):
 
     error: str = Field(..., description="Error code")
     message: str = Field(..., description="Human-readable error message")
+    correlation_id: str = Field(..., description="Unique ID for error tracking")
+
+
+class StorageErrorResponse(BaseModel):
+    """Storage error response body with retry guidance."""
+
+    error: str = Field(..., description="Error code")
+    message: str = Field(..., description="Human-readable error message")
+    correlation_id: str = Field(..., description="Unique ID for error tracking")
+    retry_after: int = Field(..., description="Seconds to wait before retrying")
 
 
 # =============================================================================
@@ -147,12 +170,18 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
         # Validate request data (batch error reporting)
         validation_result = validate_voucher_request(request_data)
         if not validation_result.is_valid:
+            correlation_id = generate_correlation_id()
+            logger.warning(
+                f"Validation failed for voucher request [correlation_id={correlation_id}] "
+                f"error_count={len(validation_result.errors)}"
+            )
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={
                     "error": "VALIDATION_FAILED",
                     "message": "Request validation failed",
-                    "errors": [
+                    "correlation_id": correlation_id,
+                    "details": [
                         {
                             "field": e.field,
                             "code": e.code,
@@ -206,22 +235,47 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
         try:
             result = generate_voucher.execute(use_case_request)
         except TemplateNotFoundError as e:
+            correlation_id = generate_correlation_id()
+            logger.warning(
+                f"Template not found: {e.template_id} [correlation_id={correlation_id}]"
+            )
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content={
                     "error": "TEMPLATE_NOT_FOUND",
                     "message": f"Template '{e.template_id}' not found",
+                    "correlation_id": correlation_id,
                 },
             )
-        except StorageError:
+        except StorageError as e:
+            correlation_id = generate_correlation_id()
+            logger.error(
+                f"Storage error: {e} [correlation_id={correlation_id}]"
+            )
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 content={
                     "error": "STORAGE_UNAVAILABLE",
                     "message": "Storage service is temporarily unavailable",
+                    "correlation_id": correlation_id,
+                    "retry_after": DEFAULT_RETRY_AFTER_SECONDS,
                 },
                 headers={
-                    "Retry-After": "60",
+                    "Retry-After": str(DEFAULT_RETRY_AFTER_SECONDS),
+                },
+            )
+        except (ValueError, RuntimeError) as e:
+            # Template processing errors (corruption, invalid format, etc.)
+            correlation_id = generate_correlation_id()
+            logger.error(
+                f"Template error: {e} [correlation_id={correlation_id}]"
+            )
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={
+                    "error": "TEMPLATE_ERROR",
+                    "message": "An error occurred while processing the template",
+                    "correlation_id": correlation_id,
                 },
             )
 
