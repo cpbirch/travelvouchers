@@ -126,6 +126,30 @@ def template_with_customer_name_placeholders(context: VoucherTestContext):
     context.available_templates.add("airport-transfer-v2")
 
 
+@given(parsers.parse('the template "{template_id}" exists with service placeholders'))
+def template_with_service_placeholders(context: VoucherTestContext, template_id: str):
+    """Ensure a template with service placeholders exists."""
+    context.available_templates.add(template_id)
+
+
+@given(parsers.parse('the template "{template_id}" exists with tour placeholders'))
+def template_with_tour_placeholders(context: VoucherTestContext, template_id: str):
+    """Ensure a template with tour placeholders exists."""
+    context.available_templates.add(template_id)
+
+
+@given('the template with optional service placeholders exists')
+def template_with_optional_service_placeholders(context: VoucherTestContext):
+    """Ensure a template with optional service placeholders exists."""
+    context.available_templates.add("airport-transfer-v2")
+
+
+@given('the template with service notes placeholder exists')
+def template_with_service_notes_placeholder(context: VoucherTestContext):
+    """Ensure a template with service notes placeholder exists."""
+    context.available_templates.add("airport-transfer-v2")
+
+
 @when('I request a voucher for:')
 def request_voucher_with_table(context: VoucherTestContext, datatable, client):
     """Build a voucher request from table data."""
@@ -172,6 +196,26 @@ def set_service_and_execute(context: VoucherTestContext, name: str, provider: st
     """Set service data and execute the request."""
     context.service_data["name"] = name
     context.service_data["provider"] = provider
+
+    # Build and execute the request
+    request_body = {
+        "template_id": context.request_data.get("template_id"),
+        "booking_id": context.request_data.get("booking_id"),
+        "service_date": context.request_data.get("service_date"),
+        "customer": context.customer_data,
+        "service": context.service_data,
+    }
+
+    context.response = client.post("/vouchers", json=request_body)
+    context.response_json = context.response.json()
+
+
+@when('service details:')
+def set_service_details_and_execute(context: VoucherTestContext, datatable, client):
+    """Set service data from table and execute the request."""
+    for row in datatable[1:]:  # Skip header row
+        if len(row) >= 2:
+            context.service_data[row[0]] = row[1]
 
     # Build and execute the request
     request_body = {

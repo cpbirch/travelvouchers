@@ -132,7 +132,7 @@ Feature: Template Loading and Data Merging
   # Sprint 2 - Core Flow
   # ============================================================================
 
-  @us-005 @skip
+  @us-005
   # James Morrison's airport transfer includes pickup/dropoff details.
   # All transfer-specific fields merge into the template.
   Scenario: Merge airport transfer service data
@@ -158,7 +158,7 @@ Feature: Template Loading and Data Merging
     And the PDF contains "Marriott Hotel"
     And the PDF contains "CLT-78432-HRW"
 
-  @us-005 @skip
+  @us-005
   # Elena Rodriguez's tour voucher uses different fields (meeting_point, tour_time).
   # The same merge logic handles different service types.
   Scenario: Merge sightseeing tour service data
@@ -181,7 +181,7 @@ Feature: Template Loading and Data Merging
     And the PDF contains "Westminster Pier"
     And the PDF contains "10:00"
 
-  @us-005 @skip
+  @us-005
   # A minimal service booking with only required fields (name, provider).
   # Optional fields render as empty without errors.
   Scenario: Handle missing optional service fields
@@ -195,7 +195,7 @@ Feature: Template Loading and Data Merging
     And service "Basic Transfer" provided by "Budget Transfers"
     Then the voucher is created successfully
 
-  @us-005 @skip
+  @us-005
   # The notes field can contain special requirements like accessibility needs.
   Scenario: Service data with special notes merged correctly
     Given the template with service notes placeholder exists

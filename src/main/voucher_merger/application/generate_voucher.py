@@ -128,7 +128,7 @@ class GenerateVoucher:
     ) -> str:
         """Merge request data into template placeholders.
 
-        Replaces all {{customer.*}} placeholders with customer data.
+        Replaces all {{customer.*}} and {{service.*}} placeholders with data.
         Missing optional fields are rendered as empty strings.
 
         Args:
@@ -139,6 +139,7 @@ class GenerateVoucher:
             Merged content with placeholders replaced.
         """
         customer = request.customer
+        service = request.service
 
         # Build customer placeholder mappings
         customer_placeholders = {
@@ -149,8 +150,26 @@ class GenerateVoucher:
             "{{customer.phone}}": customer.phone or "",
         }
 
+        # Build service placeholder mappings
+        service_placeholders = {
+            "{{service.name}}": service.name,
+            "{{service.provider}}": service.provider,
+            "{{service.pickup_time}}": service.pickup_time or "",
+            "{{service.pickup_location}}": service.pickup_location or "",
+            "{{service.dropoff_location}}": service.dropoff_location or "",
+            "{{service.passengers}}": service.passengers or "",
+            "{{service.confirmation_code}}": service.confirmation_code or "",
+            "{{service.meeting_point}}": service.meeting_point or "",
+            "{{service.tour_time}}": service.tour_time or "",
+            "{{service.duration}}": service.duration or "",
+            "{{service.notes}}": service.notes or "",
+        }
+
         merged = template_content
         for placeholder, value in customer_placeholders.items():
+            merged = merged.replace(placeholder, value)
+
+        for placeholder, value in service_placeholders.items():
             merged = merged.replace(placeholder, value)
 
         return merged

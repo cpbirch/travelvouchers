@@ -36,6 +36,15 @@ class ServiceRequest(BaseModel):
 
     name: str = Field(..., description="Name of the service")
     provider: str = Field(..., description="Service provider name")
+    pickup_time: Optional[str] = Field(None, description="Pickup time for transfers")
+    pickup_location: Optional[str] = Field(None, description="Pickup location for transfers")
+    dropoff_location: Optional[str] = Field(None, description="Dropoff location for transfers")
+    passengers: Optional[str] = Field(None, description="Number of passengers")
+    confirmation_code: Optional[str] = Field(None, description="Confirmation/booking code")
+    meeting_point: Optional[str] = Field(None, description="Meeting point for tours")
+    tour_time: Optional[str] = Field(None, description="Tour start time")
+    duration: Optional[str] = Field(None, description="Duration of service")
+    notes: Optional[str] = Field(None, description="Special notes or requirements")
 
 
 class VoucherRequest(BaseModel):
@@ -120,6 +129,15 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
         service = ServiceData(
             name=request.service.name,
             provider=request.service.provider,
+            pickup_time=request.service.pickup_time,
+            pickup_location=request.service.pickup_location,
+            dropoff_location=request.service.dropoff_location,
+            passengers=request.service.passengers,
+            confirmation_code=request.service.confirmation_code,
+            meeting_point=request.service.meeting_point,
+            tour_time=request.service.tour_time,
+            duration=request.service.duration,
+            notes=request.service.notes,
         )
 
         # Build use case request

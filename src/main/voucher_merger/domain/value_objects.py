@@ -30,10 +30,28 @@ class ServiceData:
     Attributes:
         name: Name of the service (required).
         provider: Service provider name (required).
+        pickup_time: Optional pickup time for transfers.
+        pickup_location: Optional pickup location for transfers.
+        dropoff_location: Optional dropoff location for transfers.
+        passengers: Optional number of passengers.
+        confirmation_code: Optional confirmation/booking code.
+        meeting_point: Optional meeting point for tours.
+        tour_time: Optional tour start time.
+        duration: Optional duration of service.
+        notes: Optional special notes or requirements.
     """
 
     name: str
     provider: str
+    pickup_time: str | None = None
+    pickup_location: str | None = None
+    dropoff_location: str | None = None
+    passengers: str | None = None
+    confirmation_code: str | None = None
+    meeting_point: str | None = None
+    tour_time: str | None = None
+    duration: str | None = None
+    notes: str | None = None
 
 
 @dataclass(frozen=True)

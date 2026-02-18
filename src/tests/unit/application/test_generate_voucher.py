@@ -1,11 +1,14 @@
 """Unit tests for GenerateVoucher use case.
 
-Test Budget: 5 behaviors x 2 = 10 unit tests max
+Test Budget: 8 behaviors x 2 = 16 unit tests max
 - Behavior 1: Successful voucher generation (orchestrates load, merge, render, store)
 - Behavior 2: Template not found error
 - Behavior 3: Merge logic replaces placeholder correctly
 - Behavior 4: Customer placeholder merging (first_name, last_name, title, email, phone)
 - Behavior 5: Missing optional customer fields render as empty
+- Behavior 6: Service placeholder merging (name, provider, pickup_time, pickup_location, etc.)
+- Behavior 7: Tour-specific service placeholders (meeting_point, tour_time, duration)
+- Behavior 8: Missing optional service fields render as empty
 """
 
 from datetime import date, datetime
@@ -332,3 +335,208 @@ class TestGenerateVoucher:
 
         assert last_name in merged_content.html
         assert "{{customer.last_name}}" not in merged_content.html
+
+
+class TestGenerateVoucherServiceMerging:
+    """Tests for service data merging via GenerateVoucher use case.
+
+    Test Budget: 3 behaviors x 2 = 6 unit tests max
+    - Behavior 6: Service placeholder merging (name, provider, pickup_time, etc.)
+    - Behavior 7: Tour-specific placeholders (meeting_point, tour_time, duration)
+    - Behavior 8: Missing optional service fields render as empty
+    """
+
+    @pytest.mark.parametrize(
+        "placeholder,field_name,field_value",
+        [
+            ("{{service.name}}", "name", "Airport Transfer - Heathrow"),
+            ("{{service.provider}}", "provider", "CityLink Transfers Ltd"),
+            ("{{service.pickup_time}}", "pickup_time", "14:30"),
+            ("{{service.pickup_location}}", "pickup_location", "Heathrow Terminal 5"),
+            ("{{service.dropoff_location}}", "dropoff_location", "Marriott Hotel"),
+            ("{{service.passengers}}", "passengers", "2"),
+            ("{{service.confirmation_code}}", "confirmation_code", "CLT-78432-HRW"),
+        ],
+    )
+    def test_merges_service_placeholders_into_template(
+        self, placeholder: str, field_name: str, field_value: str
+    ) -> None:
+        """Use case replaces service placeholders with actual service data."""
+        from voucher_merger.application.generate_voucher import (
+            GenerateVoucher,
+            GenerateVoucherRequest,
+        )
+
+        # Arrange
+        template_repo = Mock()
+        template_repo.find_by_id.return_value = Template(
+            template_id="test-template",
+            content=f"Service: {placeholder}",
+        )
+
+        document_renderer = Mock()
+        document_renderer.render_pdf.return_value = RenderedDocument(
+            content=b"%PDF-1.4 test", filename="voucher.pdf"
+        )
+
+        voucher_storage = Mock()
+        voucher_storage.store.return_value = StorageUrl(
+            url="file:///vouchers/voucher.pdf"
+        )
+
+        use_case = GenerateVoucher(
+            template_repository=template_repo,
+            document_renderer=document_renderer,
+            voucher_storage=voucher_storage,
+        )
+
+        # Build service data with all optional fields
+        service_kwargs = {
+            "name": "Airport Transfer - Heathrow",
+            "provider": "CityLink Transfers Ltd",
+            "pickup_time": "14:30",
+            "pickup_location": "Heathrow Terminal 5",
+            "dropoff_location": "Marriott Hotel",
+            "passengers": "2",
+            "confirmation_code": "CLT-78432-HRW",
+        }
+        service = ServiceData(**service_kwargs)
+
+        request = GenerateVoucherRequest(
+            template_id="test-template",
+            booking=BookingRef(booking_id="B-12345", service_date=date(2026, 3, 15)),
+            customer=CustomerData(first_name="James", last_name="Morrison"),
+            service=service,
+        )
+
+        # Act
+        use_case.execute(request)
+
+        # Assert - verify placeholder was replaced
+        document_renderer.render_pdf.assert_called_once()
+        call_args = document_renderer.render_pdf.call_args
+        merged_content: MergedContent = call_args[0][0]
+
+        assert field_value in merged_content.html
+        assert placeholder not in merged_content.html
+
+    @pytest.mark.parametrize(
+        "placeholder,field_name,field_value",
+        [
+            ("{{service.meeting_point}}", "meeting_point", "Westminster Pier"),
+            ("{{service.tour_time}}", "tour_time", "10:00"),
+            ("{{service.duration}}", "duration", "3 hours"),
+        ],
+    )
+    def test_merges_tour_specific_placeholders_into_template(
+        self, placeholder: str, field_name: str, field_value: str
+    ) -> None:
+        """Use case replaces tour-specific service placeholders."""
+        from voucher_merger.application.generate_voucher import (
+            GenerateVoucher,
+            GenerateVoucherRequest,
+        )
+
+        # Arrange
+        template_repo = Mock()
+        template_repo.find_by_id.return_value = Template(
+            template_id="tour-template",
+            content=f"Tour Detail: {placeholder}",
+        )
+
+        document_renderer = Mock()
+        document_renderer.render_pdf.return_value = RenderedDocument(
+            content=b"%PDF-1.4 test", filename="voucher.pdf"
+        )
+
+        voucher_storage = Mock()
+        voucher_storage.store.return_value = StorageUrl(
+            url="file:///vouchers/voucher.pdf"
+        )
+
+        use_case = GenerateVoucher(
+            template_repository=template_repo,
+            document_renderer=document_renderer,
+            voucher_storage=voucher_storage,
+        )
+
+        # Build service data with tour-specific fields
+        service_kwargs = {
+            "name": "London Eye and Thames Cruise",
+            "provider": "City Sightseeing London",
+            "meeting_point": "Westminster Pier",
+            "tour_time": "10:00",
+            "duration": "3 hours",
+            "confirmation_code": "CSL-92156-LON",
+        }
+        service = ServiceData(**service_kwargs)
+
+        request = GenerateVoucherRequest(
+            template_id="tour-template",
+            booking=BookingRef(booking_id="B-12345", service_date=date(2026, 4, 20)),
+            customer=CustomerData(first_name="Elena", last_name="Rodriguez"),
+            service=service,
+        )
+
+        # Act
+        use_case.execute(request)
+
+        # Assert - verify placeholder was replaced
+        document_renderer.render_pdf.assert_called_once()
+        call_args = document_renderer.render_pdf.call_args
+        merged_content: MergedContent = call_args[0][0]
+
+        assert field_value in merged_content.html
+        assert placeholder not in merged_content.html
+
+    def test_renders_missing_optional_service_fields_as_empty_string(self) -> None:
+        """Missing optional service fields render as empty strings."""
+        from voucher_merger.application.generate_voucher import (
+            GenerateVoucher,
+            GenerateVoucherRequest,
+        )
+
+        # Arrange
+        template_repo = Mock()
+        template_repo.find_by_id.return_value = Template(
+            template_id="test-template",
+            content="Service: {{service.name}}, Notes: {{service.notes}}",
+        )
+
+        document_renderer = Mock()
+        document_renderer.render_pdf.return_value = RenderedDocument(
+            content=b"%PDF-1.4 test", filename="voucher.pdf"
+        )
+
+        voucher_storage = Mock()
+        voucher_storage.store.return_value = StorageUrl(
+            url="file:///vouchers/voucher.pdf"
+        )
+
+        use_case = GenerateVoucher(
+            template_repository=template_repo,
+            document_renderer=document_renderer,
+            voucher_storage=voucher_storage,
+        )
+
+        # Service with only required fields (no notes)
+        service = ServiceData(name="Basic Transfer", provider="Budget Transfers")
+
+        request = GenerateVoucherRequest(
+            template_id="test-template",
+            booking=BookingRef(booking_id="B-12345", service_date=date(2026, 3, 20)),
+            customer=CustomerData(first_name="James", last_name="Morrison"),
+            service=service,
+        )
+
+        # Act
+        use_case.execute(request)
+
+        # Assert - verify name replaced, notes replaced with empty
+        document_renderer.render_pdf.assert_called_once()
+        call_args = document_renderer.render_pdf.call_args
+        merged_content: MergedContent = call_args[0][0]
+
+        assert "Basic Transfer" in merged_content.html
+        assert "{{service.name}}" not in merged_content.html
+        assert "{{service.notes}}" not in merged_content.html
