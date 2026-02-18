@@ -5,9 +5,9 @@ It translates HTTP requests to use case calls and formats responses.
 """
 
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from voucher_merger.application.generate_voucher import (
@@ -16,6 +16,7 @@ from voucher_merger.application.generate_voucher import (
     TemplateNotFoundError,
     VoucherResponse,
 )
+from voucher_merger.application.validators import validate_voucher_request
 from voucher_merger.domain.value_objects import BookingRef, CustomerData, ServiceData
 
 # =============================================================================
@@ -74,6 +75,22 @@ class VoucherApiResponse(BaseModel):
     urls: UrlsResponse = Field(..., description="URLs to access the voucher")
 
 
+class ErrorDetail(BaseModel):
+    """Single validation error detail."""
+
+    field: str = Field(..., description="Field that failed validation")
+    code: str = Field(..., description="Error code")
+    message: str = Field(..., description="Human-readable error message")
+
+
+class ValidationErrorResponse(BaseModel):
+    """Validation error response body."""
+
+    error: str = Field(..., description="Error code (VALIDATION_FAILED)")
+    message: str = Field(..., description="Human-readable summary message")
+    errors: list[ErrorDetail] = Field(..., description="List of validation errors")
+
+
 class ErrorResponse(BaseModel):
     """Error response body."""
 
@@ -103,46 +120,79 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
         status_code=status.HTTP_201_CREATED,
         summary="Generate a voucher",
         description="Generate a PDF voucher from a template.",
+        responses={
+            400: {"model": ValidationErrorResponse, "description": "Validation error"},
+            404: {"model": ErrorResponse, "description": "Template not found"},
+        },
     )
-    def create_voucher(request: VoucherRequest) -> VoucherApiResponse:
+    async def create_voucher(request: Request) -> Any:
         """Generate a voucher from the provided data.
 
         Args:
-            request: The voucher generation request.
+            request: The raw HTTP request.
 
         Returns:
             The generated voucher details including URLs.
         """
+        # Parse raw JSON body
+        try:
+            request_data = await request.json()
+        except Exception:
+            request_data = {}
+
+        # Validate request data (batch error reporting)
+        validation_result = validate_voucher_request(request_data)
+        if not validation_result.is_valid:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "error": "VALIDATION_FAILED",
+                    "message": "Request validation failed",
+                    "errors": [
+                        {
+                            "field": e.field,
+                            "code": e.code,
+                            "message": e.message,
+                        }
+                        for e in validation_result.errors
+                    ],
+                },
+            )
+
         # Parse service_date string to date object
-        service_date = date.fromisoformat(request.service_date)
+        service_date = date.fromisoformat(request_data["service_date"])
+
+        # Extract nested data
+        customer_data = request_data.get("customer", {})
+        service_data = request_data.get("service", {})
 
         # Build domain objects
         booking = BookingRef(
-            booking_id=request.booking_id,
+            booking_id=request_data["booking_id"],
             service_date=service_date,
         )
         customer = CustomerData(
-            first_name=request.customer.first_name,
-            last_name=request.customer.last_name,
-            title=request.customer.title,
+            first_name=customer_data["first_name"],
+            last_name=customer_data["last_name"],
+            title=customer_data.get("title"),
         )
         service = ServiceData(
-            name=request.service.name,
-            provider=request.service.provider,
-            pickup_time=request.service.pickup_time,
-            pickup_location=request.service.pickup_location,
-            dropoff_location=request.service.dropoff_location,
-            passengers=request.service.passengers,
-            confirmation_code=request.service.confirmation_code,
-            meeting_point=request.service.meeting_point,
-            tour_time=request.service.tour_time,
-            duration=request.service.duration,
-            notes=request.service.notes,
+            name=service_data["name"],
+            provider=service_data["provider"],
+            pickup_time=service_data.get("pickup_time"),
+            pickup_location=service_data.get("pickup_location"),
+            dropoff_location=service_data.get("dropoff_location"),
+            passengers=service_data.get("passengers"),
+            confirmation_code=service_data.get("confirmation_code"),
+            meeting_point=service_data.get("meeting_point"),
+            tour_time=service_data.get("tour_time"),
+            duration=service_data.get("duration"),
+            notes=service_data.get("notes"),
         )
 
         # Build use case request
         use_case_request = GenerateVoucherRequest(
-            template_id=request.template_id,
+            template_id=request_data["template_id"],
             booking=booking,
             customer=customer,
             service=service,
@@ -163,9 +213,9 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
         # Format response
         return VoucherApiResponse(
             voucher_id=result.voucher_id,
-            booking_id=request.booking_id,
-            service_date=request.service_date,
-            template_id=request.template_id,
+            booking_id=request_data["booking_id"],
+            service_date=request_data["service_date"],
+            template_id=request_data["template_id"],
             generated_at=result.generated_at.isoformat(),
             urls=UrlsResponse(pdf=result.urls.pdf_url),
         )
