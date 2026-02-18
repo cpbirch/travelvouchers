@@ -29,6 +29,29 @@ class StorageUrl:
     expires_at: str | None = None
 
 
+@dataclass(frozen=True)
+class VoucherMetadata:
+    """Metadata for an existing voucher.
+
+    Attributes:
+        voucher_id: Unique identifier for the voucher.
+        booking_id: Associated booking identifier.
+        service_date: Service date in ISO format.
+        template_id: Template used for generation.
+        generated_at: ISO timestamp when the voucher was generated.
+        pdf_url: URL to the stored PDF.
+        html_url: URL to the stored HTML.
+    """
+
+    voucher_id: str
+    booking_id: str
+    service_date: str
+    template_id: str
+    generated_at: str
+    pdf_url: str
+    html_url: str
+
+
 class VoucherStorage(Protocol):
     """Driven port for storing voucher documents.
 
@@ -36,6 +59,17 @@ class VoucherStorage(Protocol):
     documents. Adapters implementing this port may store documents in
     various backends (local filesystem, S3, Azure Blob, etc.).
     """
+
+    def find_existing(self) -> VoucherMetadata | None:
+        """Check if a voucher already exists for the configured booking/date.
+
+        Returns:
+            VoucherMetadata if a voucher exists, None otherwise.
+
+        This method supports idempotency by checking for existing vouchers
+        before generating new ones.
+        """
+        ...
 
     def store(self, document: RenderedDocument) -> StorageUrl:
         """Store a rendered voucher document.

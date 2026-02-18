@@ -106,6 +106,10 @@ def client(context: VoucherTestContext, storage_base_path: Path):
             self._booking_id = booking_id
             self._service_date = service_date
 
+        def find_existing(self):
+            """Delegate to the underlying storage."""
+            return self._storage.find_existing()
+
         def store(self, document: RenderedDocument) -> StorageUrl:
             result = self._storage.store(document)
             context.stored_pdf_path = str(
@@ -133,6 +137,12 @@ def client(context: VoucherTestContext, storage_base_path: Path):
                 booking_id=booking_id,
                 service_date=service_date,
             )
+
+        def find_existing(self):
+            """Check for existing voucher using the configured storage."""
+            if self._current_storage is None:
+                return None
+            return self._current_storage.find_existing()
 
         def store(self, document: RenderedDocument) -> StorageUrl:
             if self._current_storage is None:
@@ -178,6 +188,10 @@ def unavailable_client(context: VoucherTestContext, storage_base_path: Path):
 
     class FailingStorage:
         """Storage that always fails to simulate unavailability."""
+
+        def find_existing(self):
+            """No existing vouchers in test storage."""
+            return None
 
         def store(self, document: RenderedDocument) -> StorageUrl:
             from voucher_merger.ports.voucher_storage import StorageError

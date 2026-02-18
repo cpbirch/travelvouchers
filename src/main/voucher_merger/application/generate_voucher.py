@@ -55,11 +55,30 @@ class VoucherResponse:
         voucher_id: Unique identifier for the generated voucher.
         urls: URLs where the voucher can be accessed.
         generated_at: Timestamp when the voucher was generated.
+        is_existing: Whether this is an existing voucher (False for new).
     """
 
     voucher_id: str
     urls: VoucherUrls
     generated_at: datetime
+    is_existing: bool = False
+
+
+@dataclass(frozen=True)
+class ExistingVoucherResponse:
+    """Response object for an existing voucher (idempotency).
+
+    Attributes:
+        voucher_id: Unique identifier for the existing voucher.
+        urls: URLs where the voucher can be accessed.
+        generated_at: Original timestamp when the voucher was generated.
+        is_existing: Always True for existing vouchers.
+    """
+
+    voucher_id: str
+    urls: VoucherUrls
+    generated_at: str  # ISO string from stored metadata
+    is_existing: bool = True
 
 
 class GenerateVoucher:
@@ -90,41 +109,71 @@ class GenerateVoucher:
         self._document_renderer = document_renderer
         self._voucher_storage = voucher_storage
 
-    def execute(self, request: GenerateVoucherRequest) -> VoucherResponse:
+    def execute(
+        self, request: GenerateVoucherRequest
+    ) -> VoucherResponse | ExistingVoucherResponse:
         """Execute the voucher generation workflow.
 
         Args:
             request: The voucher generation request.
 
         Returns:
-            VoucherResponse with generated voucher details.
+            VoucherResponse with generated voucher details, or
+            ExistingVoucherResponse if a voucher already exists (idempotency).
 
         Raises:
             TemplateNotFoundError: If the requested template is not found.
         """
-        # 1. Load template
-        template = self._template_repository.find_by_id(request.template_id)
-        if template is None:
-            raise TemplateNotFoundError(request.template_id)
-
-        # 2. Merge customer data into template
-        merged_html = self._merge_template(template.content, request)
-        merged_content = MergedContent(html=merged_html)
-
-        # 3. Render to PDF
-        rendered_document = self._document_renderer.render_pdf(merged_content)
-
-        # 4. Render to email-compatible HTML
-        rendered_html = self._document_renderer.render_html(merged_content)
-
-        # 5. Configure storage with booking context (if supported)
-        # This allows storage factories to create properly configured storage
+        # 0. Configure storage with booking context (if supported)
+        # This must happen BEFORE idempotency check
         if hasattr(self._voucher_storage, "configure"):
             service_date_str = request.booking.service_date.strftime("%Y-%m-%d")
             self._voucher_storage.configure(
                 booking_id=request.booking.booking_id,
                 service_date=service_date_str,
             )
+
+        # 1. Check for existing voucher (idempotency)
+        existing = self._voucher_storage.find_existing()
+        if existing is not None:
+            # Return existing voucher metadata
+            # Handle both dict (from test fixtures) and VoucherMetadata (from real storage)
+            if isinstance(existing, dict):
+                return ExistingVoucherResponse(
+                    voucher_id=existing.get("voucher_id", ""),
+                    urls=VoucherUrls(
+                        pdf_url=existing.get("pdf_url", ""),
+                        html_url=existing.get("html_url"),
+                    ),
+                    generated_at=existing.get("generated_at", ""),
+                    is_existing=True,
+                )
+            else:
+                # VoucherMetadata dataclass
+                return ExistingVoucherResponse(
+                    voucher_id=existing.voucher_id,
+                    urls=VoucherUrls(
+                        pdf_url=existing.pdf_url,
+                        html_url=existing.html_url,
+                    ),
+                    generated_at=existing.generated_at,
+                    is_existing=True,
+                )
+
+        # 2. Load template
+        template = self._template_repository.find_by_id(request.template_id)
+        if template is None:
+            raise TemplateNotFoundError(request.template_id)
+
+        # 3. Merge customer data into template
+        merged_html = self._merge_template(template.content, request)
+        merged_content = MergedContent(html=merged_html)
+
+        # 4. Render to PDF
+        rendered_document = self._document_renderer.render_pdf(merged_content)
+
+        # 5. Render to email-compatible HTML
+        rendered_html = self._document_renderer.render_html(merged_content)
 
         # 6. Store vouchers (PDF and HTML)
         pdf_storage_url = self._voucher_storage.store(rendered_document)

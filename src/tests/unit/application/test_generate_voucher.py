@@ -1,6 +1,6 @@
 """Unit tests for GenerateVoucher use case.
 
-Test Budget: 8 behaviors x 2 = 16 unit tests max
+Test Budget: 9 behaviors x 2 = 18 unit tests max
 - Behavior 1: Successful voucher generation (orchestrates load, merge, render, store)
 - Behavior 2: Template not found error
 - Behavior 3: Merge logic replaces placeholder correctly
@@ -9,6 +9,7 @@ Test Budget: 8 behaviors x 2 = 16 unit tests max
 - Behavior 6: Service placeholder merging (name, provider, pickup_time, pickup_location, etc.)
 - Behavior 7: Tour-specific service placeholders (meeting_point, tour_time, duration)
 - Behavior 8: Missing optional service fields render as empty
+- Behavior 9: Idempotency - return existing voucher if already generated
 """
 
 from datetime import date, datetime
@@ -45,6 +46,7 @@ class TestGenerateVoucher:
         )
 
         voucher_storage = Mock()
+        voucher_storage.find_existing.return_value = None  # No existing voucher
         voucher_storage.store.return_value = StorageUrl(
             url="file:///vouchers/voucher.pdf"
         )
@@ -88,6 +90,7 @@ class TestGenerateVoucher:
 
         document_renderer = Mock()
         voucher_storage = Mock()
+        voucher_storage.find_existing.return_value = None  # No existing voucher
 
         use_case = GenerateVoucher(
             template_repository=template_repo,
@@ -128,6 +131,7 @@ class TestGenerateVoucher:
         )
 
         voucher_storage = Mock()
+        voucher_storage.find_existing.return_value = None  # No existing voucher
         voucher_storage.store.return_value = StorageUrl(
             url="file:///vouchers/voucher.pdf"
         )
@@ -188,6 +192,7 @@ class TestGenerateVoucher:
         )
 
         voucher_storage = Mock()
+        voucher_storage.find_existing.return_value = None  # No existing voucher
         voucher_storage.store.return_value = StorageUrl(
             url="file:///vouchers/voucher.pdf"
         )
@@ -246,6 +251,7 @@ class TestGenerateVoucher:
         )
 
         voucher_storage = Mock()
+        voucher_storage.find_existing.return_value = None  # No existing voucher
         voucher_storage.store.return_value = StorageUrl(
             url="file:///vouchers/voucher.pdf"
         )
@@ -306,6 +312,7 @@ class TestGenerateVoucher:
         )
 
         voucher_storage = Mock()
+        voucher_storage.find_existing.return_value = None  # No existing voucher
         voucher_storage.store.return_value = StorageUrl(
             url="file:///vouchers/voucher.pdf"
         )
@@ -380,6 +387,7 @@ class TestGenerateVoucherServiceMerging:
         )
 
         voucher_storage = Mock()
+        voucher_storage.find_existing.return_value = None  # No existing voucher
         voucher_storage.store.return_value = StorageUrl(
             url="file:///vouchers/voucher.pdf"
         )
@@ -450,6 +458,7 @@ class TestGenerateVoucherServiceMerging:
         )
 
         voucher_storage = Mock()
+        voucher_storage.find_existing.return_value = None  # No existing voucher
         voucher_storage.store.return_value = StorageUrl(
             url="file:///vouchers/voucher.pdf"
         )
@@ -509,6 +518,7 @@ class TestGenerateVoucherServiceMerging:
         )
 
         voucher_storage = Mock()
+        voucher_storage.find_existing.return_value = None  # No existing voucher
         voucher_storage.store.return_value = StorageUrl(
             url="file:///vouchers/voucher.pdf"
         )
@@ -540,3 +550,115 @@ class TestGenerateVoucherServiceMerging:
         assert "Basic Transfer" in merged_content.html
         assert "{{service.name}}" not in merged_content.html
         assert "{{service.notes}}" not in merged_content.html
+
+
+class TestGenerateVoucherIdempotency:
+    """Tests for idempotency behavior via GenerateVoucher use case.
+
+    Test Budget: 1 behavior x 2 = 2 unit tests max
+    - Behavior 9: Return existing voucher if already generated for booking_id + service_date
+    """
+
+    def test_returns_existing_voucher_when_already_generated(self) -> None:
+        """Use case returns existing voucher metadata when storage has existing voucher."""
+        from voucher_merger.application.generate_voucher import (
+            GenerateVoucher,
+            GenerateVoucherRequest,
+            VoucherResponse,
+            ExistingVoucherResponse,
+        )
+
+        # Arrange - mock storage that returns existing voucher
+        template_repo = Mock()
+        document_renderer = Mock()
+        voucher_storage = Mock()
+
+        # Storage returns existing voucher metadata
+        existing_metadata = {
+            "voucher_id": "V-BK-2024-90001-20240315",
+            "booking_id": "BK-2024-90001",
+            "service_date": "2024-03-15",
+            "template_id": "airport-transfer-v2",
+            "generated_at": "2024-02-17T10:23:45Z",
+            "pdf_url": "file:///vouchers/BK-2024-90001/2024-03-15/voucher.pdf",
+            "html_url": "file:///vouchers/BK-2024-90001/2024-03-15/voucher.html",
+        }
+        voucher_storage.find_existing.return_value = existing_metadata
+
+        use_case = GenerateVoucher(
+            template_repository=template_repo,
+            document_renderer=document_renderer,
+            voucher_storage=voucher_storage,
+        )
+
+        request = GenerateVoucherRequest(
+            template_id="airport-transfer-v2",
+            booking=BookingRef(booking_id="BK-2024-90001", service_date=date(2024, 3, 15)),
+            customer=CustomerData(first_name="James", last_name="Morrison"),
+            service=ServiceData(name="Airport Transfer", provider="CityLink Transfers"),
+        )
+
+        # Act
+        result = use_case.execute(request)
+
+        # Assert - returns existing voucher, not a new one
+        assert isinstance(result, ExistingVoucherResponse)
+        assert result.voucher_id == "V-BK-2024-90001-20240315"
+        assert result.generated_at == "2024-02-17T10:23:45Z"
+        assert result.is_existing is True
+
+        # Template repo and renderer should NOT be called
+        template_repo.find_by_id.assert_not_called()
+        document_renderer.render_pdf.assert_not_called()
+        voucher_storage.store.assert_not_called()
+
+    def test_generates_new_voucher_when_none_exists(self) -> None:
+        """Use case generates new voucher when storage has no existing voucher."""
+        from voucher_merger.application.generate_voucher import (
+            GenerateVoucher,
+            GenerateVoucherRequest,
+            VoucherResponse,
+        )
+
+        # Arrange - mock storage that returns None (no existing voucher)
+        template_repo = Mock()
+        template_repo.find_by_id.return_value = Template(
+            template_id="airport-transfer-v2",
+            content="Dear {{customer.last_name}}, Your voucher is confirmed.",
+        )
+
+        document_renderer = Mock()
+        document_renderer.render_pdf.return_value = RenderedDocument(
+            content=b"%PDF-1.4 test", filename="voucher.pdf"
+        )
+
+        voucher_storage = Mock()
+        voucher_storage.find_existing.return_value = None  # No existing voucher
+        voucher_storage.store.return_value = StorageUrl(
+            url="file:///vouchers/voucher.pdf"
+        )
+
+        use_case = GenerateVoucher(
+            template_repository=template_repo,
+            document_renderer=document_renderer,
+            voucher_storage=voucher_storage,
+        )
+
+        request = GenerateVoucherRequest(
+            template_id="airport-transfer-v2",
+            booking=BookingRef(booking_id="BK-2024-90002", service_date=date(2024, 3, 16)),
+            customer=CustomerData(first_name="Elena", last_name="Rodriguez"),
+            service=ServiceData(name="Airport Transfer", provider="CityLink Transfers"),
+        )
+
+        # Act
+        result = use_case.execute(request)
+
+        # Assert - generates new voucher
+        assert isinstance(result, VoucherResponse)
+        assert "BK-2024-90002" in result.voucher_id
+
+        # Template repo and renderer SHOULD be called
+        template_repo.find_by_id.assert_called_once()
+        document_renderer.render_pdf.assert_called_once()
+        voucher_storage.store.assert_called_once()

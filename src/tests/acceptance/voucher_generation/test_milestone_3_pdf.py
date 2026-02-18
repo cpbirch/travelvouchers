@@ -120,6 +120,10 @@ def client(context: VoucherTestContext):
 
     # Mock storage (avoids filesystem dependency)
     class MockVoucherStorage:
+        def find_existing(self):
+            """No existing vouchers in test storage."""
+            return None
+
         def store(self, document: RenderedDocument) -> StorageUrl:
             return StorageUrl(url="file:///vouchers/test/voucher.pdf")
 
@@ -159,6 +163,10 @@ def unavailable_client(context: VoucherTestContext):
 
     class FailingStorage:
         """Storage that always fails to simulate unavailability."""
+
+        def find_existing(self):
+            """No existing vouchers in test storage."""
+            return None
 
         def store(self, document: RenderedDocument) -> StorageUrl:
             from voucher_merger.ports.voucher_storage import StorageError

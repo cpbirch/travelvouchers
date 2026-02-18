@@ -13,12 +13,10 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
   # Sprint 4 - Robustness
   # ============================================================================
 
-  @us-009 @skip @critical
+  # The booking service retried due to network timeout.
+  # The second request should return the original voucher, not create a duplicate.
+  @us-009 @critical
   Scenario: Duplicate request returns existing voucher
-    """
-    The booking service retried due to network timeout.
-    The second request should return the original voucher, not create a duplicate.
-    """
     Given a voucher was previously generated for:
       | field        | value               |
       | booking_id   | BK-2024-90001       |
@@ -36,12 +34,10 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
     And the response contains generated_at "2024-02-17T10:23:45Z"
     And no new files are written to storage
 
+  # James Morrison has a transfer on March 15 and another on March 16.
+  # Each date is a separate service, requiring a separate voucher.
   @us-009 @skip
   Scenario: Same booking different dates creates separate vouchers
-    """
-    James Morrison has a transfer on March 15 and another on March 16.
-    Each date is a separate service, requiring a separate voucher.
-    """
     Given a voucher exists for booking "BK-2024-90002" date "2024-03-15"
     When I request a voucher for:
       | field        | value               |
@@ -53,12 +49,10 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
     Then the response status is 201 Created
     And the voucher_id is different from the existing voucher
 
+  # James Morrison (BK-2024-90003) and Elena Rodriguez (BK-2024-90004)
+  # both have transfers on March 15. Each needs their own voucher.
   @us-009 @skip
   Scenario: Different bookings same date creates separate vouchers
-    """
-    James Morrison (BK-2024-90003) and Elena Rodriguez (BK-2024-90004)
-    both have transfers on March 15. Each needs their own voucher.
-    """
     Given a voucher exists for booking "BK-2024-90003" date "2024-03-15"
     When I request a voucher for:
       | field        | value               |
@@ -70,12 +64,10 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
     Then the response status is 201 Created
     And the voucher_id is different from the existing voucher
 
+  # When returning a cached voucher, all metadata from the original
+  # generation must be preserved.
   @us-009 @skip
   Scenario: Idempotent response preserves all original metadata
-    """
-    When returning a cached voucher, all metadata from the original
-    generation must be preserved.
-    """
     Given a voucher was previously generated with:
       | field        | value               |
       | booking_id   | BK-2024-90005       |
@@ -92,13 +84,11 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
   # Sprint 4 - Robustness
   # ============================================================================
 
+  # Marketing created a template with {{customer.nickname}} which is not
+  # in the schema. The voucher generates with the placeholder rendered empty,
+  # and a warning is logged for operations.
   @us-003 @skip
   Scenario: Template with unknown placeholder logs warning but succeeds
-    """
-    Marketing created a template with {{customer.nickname}} which is not
-    in the schema. The voucher generates with the placeholder rendered empty,
-    and a warning is logged for operations.
-    """
     Given the template "custom-placeholders" contains "Hello {{customer.nickname}}"
     When I request a voucher for:
       | field        | value              |
@@ -110,22 +100,18 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
     Then the voucher is created successfully
     And a warning is logged about unknown placeholder "customer.nickname"
 
+  # A template contains {{customer.lst_name}} (typo for last_name).
+  # The system should detect this and suggest the correct placeholder.
   @us-003 @skip
   Scenario: Template with typo in placeholder detected
-    """
-    A template contains {{customer.lst_name}} (typo for last_name).
-    The system should detect this and suggest the correct placeholder.
-    """
     Given the template "typo-template" contains "Dear {{customer.lst_name}}"
     When the template "typo-template" is validated
     Then validation reports unknown placeholder "customer.lst_name"
     And validation suggests "Did you mean: customer.last_name?"
 
+  # A well-formed template with only valid placeholders passes validation.
   @us-003 @skip
   Scenario: Template validation passes for all known placeholders
-    """
-    A well-formed template with only valid placeholders passes validation.
-    """
     Given the template "valid-template" contains only known placeholders:
       | placeholder              |
       | {{customer.first_name}}  |
@@ -135,12 +121,10 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
     When the template "valid-template" is validated
     Then validation passes with no errors
 
+  # Using {{customer.phone}} is valid but may render empty for customers
+  # who did not provide phone numbers. This generates a warning.
   @us-003 @skip
   Scenario: Template validation warns about optional fields
-    """
-    Using {{customer.phone}} is valid but may render empty for customers
-    who did not provide phone numbers. This generates a warning.
-    """
     Given the template "optional-fields" contains "Phone: {{customer.phone}}"
     When the template "optional-fields" is validated
     Then validation passes
@@ -151,12 +135,10 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
   # Sprint 4 - Robustness
   # ============================================================================
 
+  # All validation errors follow the same JSON structure for
+  # programmatic handling by the booking service.
   @us-011 @skip
   Scenario: Validation error has consistent structure
-    """
-    All validation errors follow the same JSON structure for
-    programmatic handling by the booking service.
-    """
     When I request a voucher with missing customer last_name
     Then the response status is 400 Bad Request
     And the error response contains:
@@ -166,11 +148,9 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
       | correlation_id | string |
       | details        | array  |
 
+  # 404 errors also follow the standard error structure.
   @us-011 @skip
   Scenario: Template not found error has consistent structure
-    """
-    404 errors also follow the standard error structure.
-    """
     When I request a voucher with template_id "non-existent"
     Then the response status is 404 Not Found
     And the error response contains:
@@ -178,12 +158,10 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
       | error          | TEMPLATE_NOT_FOUND |
     And the error response contains a correlation_id
 
+  # 503 errors include retry_after so the booking service knows
+  # when to retry the request.
   @us-011 @skip
   Scenario: Storage error includes retry guidance
-    """
-    503 errors include retry_after so the booking service knows
-    when to retry the request.
-    """
     Given the storage service is temporarily unavailable
     When I request a voucher for:
       | field        | value               |
@@ -196,22 +174,18 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
     And the error response contains "retry_after" as integer
     And the response header "Retry-After" is present
 
+  # Every error response includes a correlation_id that support
+  # can use to find related log entries.
   @us-011 @skip
   Scenario: All error responses include correlation ID
-    """
-    Every error response includes a correlation_id that support
-    can use to find related log entries.
-    """
     When I request a voucher with invalid data
     Then the error response contains a correlation_id
     And the correlation_id is logged with the error
 
+  # If a template file is corrupted (invalid DOCX/ODT), the error
+  # response identifies it as a template problem.
   @us-011 @skip
   Scenario: Corrupted template returns 500 with error details
-    """
-    If a template file is corrupted (invalid DOCX/ODT), the error
-    response identifies it as a template problem.
-    """
     Given the template "corrupted-template" exists but is corrupted
     When I request a voucher for:
       | field        | value              |
@@ -224,12 +198,10 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
     And the error code is "TEMPLATE_ERROR"
     And the error response contains a correlation_id
 
+  # Error messages should be understandable by developers without
+  # looking up error codes.
   @us-011 @skip
   Scenario: Error message is human-readable
-    """
-    Error messages should be understandable by developers without
-    looking up error codes.
-    """
     When I request a voucher with service_date "invalid-date"
     Then the response status is 400 Bad Request
     And the error message is human-readable

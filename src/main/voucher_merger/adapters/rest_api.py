@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from voucher_merger.application.generate_voucher import (
+    ExistingVoucherResponse,
     GenerateVoucher,
     GenerateVoucherRequest,
     TemplateNotFoundError,
@@ -203,7 +204,7 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
 
         # Execute use case
         try:
-            result: VoucherResponse = generate_voucher.execute(use_case_request)
+            result = generate_voucher.execute(use_case_request)
         except TemplateNotFoundError as e:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -224,7 +225,24 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
                 },
             )
 
-        # Format response
+        # Handle idempotent response (existing voucher)
+        if isinstance(result, ExistingVoucherResponse):
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "voucher_id": result.voucher_id,
+                    "booking_id": request_data["booking_id"],
+                    "service_date": request_data["service_date"],
+                    "template_id": request_data["template_id"],
+                    "generated_at": result.generated_at,
+                    "urls": {
+                        "pdf": result.urls.pdf_url,
+                        "html": result.urls.html_url,
+                    },
+                },
+            )
+
+        # Format response for new voucher (201 Created)
         return VoucherApiResponse(
             voucher_id=result.voucher_id,
             booking_id=request_data["booking_id"],

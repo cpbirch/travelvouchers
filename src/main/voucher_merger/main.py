@@ -82,11 +82,23 @@ def create_app(
                 service_date=service_date,
             )
 
+        def find_existing(self):
+            """Check for existing voucher using the configured storage."""
+            if self._current_storage is None:
+                return None
+            return self._current_storage.find_existing()
+
         def store(self, document):
             """Store a document using the configured storage."""
             if self._current_storage is None:
                 raise RuntimeError("Storage not configured. Call configure() first.")
             return self._current_storage.store(document)
+
+        def store_html(self, document):
+            """Store HTML document using the configured storage."""
+            if self._current_storage is None:
+                raise RuntimeError("Storage not configured. Call configure() first.")
+            return self._current_storage.store_html(document)
 
     storage_factory = StorageFactory(storage_base_path)
 

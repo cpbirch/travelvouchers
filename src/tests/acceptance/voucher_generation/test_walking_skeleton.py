@@ -68,6 +68,10 @@ def client():
 
     # Mock storage (avoids filesystem dependency)
     class MockVoucherStorage:
+        def find_existing(self):
+            """No existing vouchers in test storage."""
+            return None
+
         def store(self, document: RenderedDocument) -> StorageUrl:
             return StorageUrl(url="file:///vouchers/test/voucher.pdf")
 

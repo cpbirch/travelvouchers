@@ -1,9 +1,10 @@
 """Filesystem storage adapter for voucher documents."""
 
+import json
 from pathlib import Path
 
 from voucher_merger.ports.document_renderer import RenderedDocument, RenderedHtmlDocument
-from voucher_merger.ports.voucher_storage import StorageError, StorageUrl
+from voucher_merger.ports.voucher_storage import StorageError, StorageUrl, VoucherMetadata
 
 
 class FilesystemStorage:
@@ -31,6 +32,61 @@ class FilesystemStorage:
         self._booking_id = booking_id
         self._service_date = service_date
 
+    def _get_storage_dir(self) -> Path:
+        """Get the storage directory for this voucher."""
+        return self._base_path / "vouchers" / self._booking_id / self._service_date
+
+    def find_existing(self) -> VoucherMetadata | None:
+        """Check if a voucher already exists for this booking/date.
+
+        Returns:
+            VoucherMetadata if a voucher exists, None otherwise.
+        """
+        storage_dir = self._get_storage_dir()
+        metadata_path = storage_dir / "metadata.json"
+
+        if not metadata_path.exists():
+            return None
+
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            return VoucherMetadata(
+                voucher_id=data["voucher_id"],
+                booking_id=data["booking_id"],
+                service_date=data["service_date"],
+                template_id=data["template_id"],
+                generated_at=data["generated_at"],
+                pdf_url=data["pdf_url"],
+                html_url=data["html_url"],
+            )
+        except (OSError, json.JSONDecodeError, KeyError):
+            return None
+
+    def store_metadata(self, metadata: VoucherMetadata) -> None:
+        """Store voucher metadata for idempotency checking.
+
+        Args:
+            metadata: The voucher metadata to store.
+        """
+        storage_dir = self._get_storage_dir()
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        metadata_path = storage_dir / "metadata.json"
+
+        data = {
+            "voucher_id": metadata.voucher_id,
+            "booking_id": metadata.booking_id,
+            "service_date": metadata.service_date,
+            "template_id": metadata.template_id,
+            "generated_at": metadata.generated_at,
+            "pdf_url": metadata.pdf_url,
+            "html_url": metadata.html_url,
+        }
+
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
     def store(self, document: RenderedDocument) -> StorageUrl:
         """Store a rendered voucher document on the filesystem.
 
@@ -47,9 +103,7 @@ class FilesystemStorage:
         Raises:
             StorageError: If the document cannot be stored due to filesystem errors.
         """
-        storage_dir = (
-            self._base_path / "vouchers" / self._booking_id / self._service_date
-        )
+        storage_dir = self._get_storage_dir()
 
         try:
             storage_dir.mkdir(parents=True, exist_ok=True)
@@ -78,9 +132,7 @@ class FilesystemStorage:
         Raises:
             StorageError: If the document cannot be stored due to filesystem errors.
         """
-        storage_dir = (
-            self._base_path / "vouchers" / self._booking_id / self._service_date
-        )
+        storage_dir = self._get_storage_dir()
 
         try:
             storage_dir.mkdir(parents=True, exist_ok=True)
