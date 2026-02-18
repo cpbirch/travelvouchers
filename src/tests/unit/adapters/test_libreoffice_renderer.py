@@ -89,3 +89,75 @@ class TestLibreOfficeRenderer:
                 renderer.render_pdf(merged_content)
 
             assert "LibreOffice not found" in str(exc_info.value)
+
+    def test_preserves_formatted_html_content_in_conversion(self) -> None:
+        """render_pdf writes formatted HTML (tables, bold, colors) to temp file for LibreOffice.
+
+        Step 03-01: Verify that HTML with formatting elements (tables, bold text,
+        inline styles for colors) is correctly passed through to LibreOffice.
+        """
+        formatted_html = """<!DOCTYPE html>
+<html>
+<head><style>
+    .provider { font-weight: bold; color: #003366; }
+    table { border-collapse: collapse; }
+    td { border: 1px solid #ccc; padding: 8px; }
+</style></head>
+<body>
+    <table>
+        <tr><td>Pickup</td><td>Heathrow Terminal 5</td></tr>
+        <tr><td>Provider</td><td class="provider">CityLink Transfers Ltd</td></tr>
+    </table>
+</body>
+</html>"""
+        merged_content = MergedContent(html=formatted_html)
+        fake_pdf_bytes = b"%PDF-1.4 fake pdf with formatting"
+        captured_html_content = []
+
+        def simulate_libreoffice_preserving_format(cmd, **kwargs):
+            """Simulate LibreOffice conversion, capturing input HTML."""
+            outdir_index = cmd.index("--outdir") + 1
+            output_dir = cmd[outdir_index]
+            input_path = cmd[-1]
+
+            # Capture what was written to the input file
+            html_content = Path(input_path).read_text(encoding="utf-8")
+            captured_html_content.append(html_content)
+
+            # Create fake PDF output
+            input_name = Path(input_path).name
+            output_name = input_name.replace(".html", ".pdf")
+            output_path = Path(output_dir) / output_name
+            output_path.write_bytes(fake_pdf_bytes)
+
+            return MagicMock(returncode=0)
+
+        with patch(
+            "voucher_merger.adapters.libreoffice_renderer.subprocess.run"
+        ) as mock_run:
+            mock_run.side_effect = simulate_libreoffice_preserving_format
+
+            renderer = LibreOfficeRenderer()
+            result = renderer.render_pdf(merged_content)
+
+            # Verify PDF was produced
+            assert result.content == fake_pdf_bytes
+
+            # Verify the formatted HTML was preserved in the input file
+            assert len(captured_html_content) == 1
+            written_html = captured_html_content[0]
+
+            # Table structure preserved
+            assert "<table>" in written_html
+            assert "<tr>" in written_html
+            assert "<td>" in written_html
+
+            # Bold styling preserved
+            assert "font-weight: bold" in written_html
+
+            # Color styling preserved
+            assert "#003366" in written_html
+
+            # Content preserved
+            assert "CityLink Transfers Ltd" in written_html
+            assert "Heathrow Terminal 5" in written_html

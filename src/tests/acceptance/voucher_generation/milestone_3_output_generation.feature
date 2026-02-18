@@ -13,12 +13,9 @@ Feature: Output Generation and Storage
   # Sprint 3 - Output Generation
   # ============================================================================
 
-  @us-006 @skip
+  @us-006
   Scenario: Generate PDF with preserved formatting
-    """
-    James Morrison's voucher retains the professional formatting
-    from the marketing-created template.
-    """
+    # Voucher retains the professional formatting from the marketing-created template.
     Given the template contains formatted elements:
       | element    | description           |
       | tables     | pickup details table  |
@@ -37,9 +34,7 @@ Feature: Output Generation and Storage
 
   @us-006 @skip
   Scenario: Generated PDF is within size limits
-    """
-    PDFs must be under 500KB to ensure fast downloads and email attachment compatibility.
-    """
+    # PDFs must be under 500KB to ensure fast downloads and email attachment compatibility.
     When I request a voucher for:
       | field        | value               |
       | template_id  | airport-transfer-v2 |
@@ -52,10 +47,8 @@ Feature: Output Generation and Storage
 
   @us-006 @skip
   Scenario: Generated PDF contains searchable text
-    """
-    The PDF must contain actual text (not images of text) so customers
-    can search and copy information like confirmation codes.
-    """
+    # The PDF must contain actual text (not images of text) so customers
+    # can search and copy information like confirmation codes.
     When I request a voucher for:
       | field        | value               |
       | template_id  | airport-transfer-v2 |
@@ -73,9 +66,7 @@ Feature: Output Generation and Storage
 
   @us-006 @skip
   Scenario: Generated PDF with embedded logo image
-    """
-    The CityLink logo from the template is preserved in the PDF.
-    """
+    # The CityLink logo from the template is preserved in the PDF.
     Given the template contains a company logo image
     When I request a voucher for:
       | field        | value               |
@@ -89,10 +80,8 @@ Feature: Output Generation and Storage
 
   @us-006 @skip
   Scenario: Multi-page voucher with terms and conditions
-    """
-    Some vouchers include lengthy terms that span multiple pages.
-    Page breaks should be preserved correctly.
-    """
+    # Some vouchers include lengthy terms that span multiple pages.
+    # Page breaks should be preserved correctly.
     Given the template "detailed-voucher-v1" spans multiple pages
     When I request a voucher for:
       | field        | value              |
@@ -111,10 +100,8 @@ Feature: Output Generation and Storage
 
   @us-007 @skip
   Scenario: Generate email-compatible HTML
-    """
-    Elena Rodriguez receives her voucher by email.
-    The HTML must render correctly in Gmail, Outlook, and Apple Mail.
-    """
+    # Elena Rodriguez receives her voucher by email.
+    # The HTML must render correctly in Gmail, Outlook, and Apple Mail.
     When I request a voucher for:
       | field        | value               |
       | template_id  | sightseeing-tour-v1 |
@@ -129,10 +116,8 @@ Feature: Output Generation and Storage
 
   @us-007 @skip
   Scenario: HTML renders without network dependencies
-    """
-    A customer opens the voucher while in airplane mode.
-    All resources must be embedded, not fetched from external URLs.
-    """
+    # A customer opens the voucher while in airplane mode.
+    # All resources must be embedded, not fetched from external URLs.
     When I request a voucher for:
       | field        | value               |
       | template_id  | airport-transfer-v2 |
@@ -146,9 +131,7 @@ Feature: Output Generation and Storage
 
   @us-007 @skip
   Scenario: Generated HTML is valid HTML5
-    """
-    The HTML document should be valid HTML5 for maximum browser compatibility.
-    """
+    # The HTML document should be valid HTML5 for maximum browser compatibility.
     When I request a voucher for:
       | field        | value               |
       | template_id  | airport-transfer-v2 |
@@ -161,9 +144,7 @@ Feature: Output Generation and Storage
 
   @us-007 @skip
   Scenario: HTML contains all merged content
-    """
-    All the same content in the PDF appears in the HTML version.
-    """
+    # All the same content in the PDF appears in the HTML version.
     When I request a voucher for:
       | field        | value               |
       | template_id  | airport-transfer-v2 |
@@ -187,10 +168,8 @@ Feature: Output Generation and Storage
 
   @us-008 @skip
   Scenario: Store voucher at predictable path
-    """
-    The booking service can predict where vouchers are stored based on
-    booking_id and service_date, useful for support retrieval.
-    """
+    # The booking service can predict where vouchers are stored based on
+    # booking_id and service_date, useful for support retrieval.
     When I request a voucher for:
       | field        | value               |
       | template_id  | airport-transfer-v2 |
@@ -204,9 +183,7 @@ Feature: Output Generation and Storage
 
   @us-008 @skip
   Scenario: Returned URLs are accessible
-    """
-    The URLs returned in the response must actually work when accessed.
-    """
+    # The URLs returned in the response must actually work when accessed.
     When I request a voucher for:
       | field        | value               |
       | template_id  | airport-transfer-v2 |
@@ -222,9 +199,7 @@ Feature: Output Generation and Storage
 
   @us-008 @skip
   Scenario: Response includes both PDF and HTML URLs
-    """
-    Every successful voucher generation returns URLs for both formats.
-    """
+    # Every successful voucher generation returns URLs for both formats.
     When I request a voucher for:
       | field        | value               |
       | template_id  | airport-transfer-v2 |
@@ -238,10 +213,7 @@ Feature: Output Generation and Storage
 
   @us-008 @skip
   Scenario: Storage unavailable returns 503 with retry guidance
-    """
-    When storage is down, the API returns 503 with Retry-After header
-    so the booking service knows when to retry.
-    """
+    # When storage is down, the API returns 503 with Retry-After header so the booking service knows when to retry.
     Given the storage service is unavailable
     When I request a voucher for:
       | field        | value               |
