@@ -87,7 +87,7 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
   # Marketing created a template with {{customer.nickname}} which is not
   # in the schema. The voucher generates with the placeholder rendered empty,
   # and a warning is logged for operations.
-  @us-003 @skip
+  @us-003
   Scenario: Template with unknown placeholder logs warning but succeeds
     Given the template "custom-placeholders" contains "Hello {{customer.nickname}}"
     When I request a voucher for:
@@ -102,7 +102,7 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
 
   # A template contains {{customer.lst_name}} (typo for last_name).
   # The system should detect this and suggest the correct placeholder.
-  @us-003 @skip
+  @us-003
   Scenario: Template with typo in placeholder detected
     Given the template "typo-template" contains "Dear {{customer.lst_name}}"
     When the template "typo-template" is validated
@@ -110,7 +110,7 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
     And validation suggests "Did you mean: customer.last_name?"
 
   # A well-formed template with only valid placeholders passes validation.
-  @us-003 @skip
+  @us-003
   Scenario: Template validation passes for all known placeholders
     Given the template "valid-template" contains only known placeholders:
       | placeholder              |
@@ -123,7 +123,7 @@ Feature: Robustness - Idempotency, Validation, and Error Handling
 
   # Using {{customer.phone}} is valid but may render empty for customers
   # who did not provide phone numbers. This generates a warning.
-  @us-003 @skip
+  @us-003
   Scenario: Template validation warns about optional fields
     Given the template "optional-fields" contains "Phone: {{customer.phone}}"
     When the template "optional-fields" is validated

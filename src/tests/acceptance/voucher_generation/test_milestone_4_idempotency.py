@@ -469,7 +469,15 @@ def response_contains_specific_template_id(context: VoucherTestContext, template
 
 
 # =============================================================================
-# Load Scenarios - US-009 only (non-skipped scenarios)
+# Load Scenarios - US-009 only (idempotency scenarios)
 # =============================================================================
 
-scenarios('milestone_4_robustness.feature')
+from pytest_bdd import scenario
+
+@scenario(
+    'milestone_4_robustness.feature',
+    'Duplicate request returns existing voucher'
+)
+def test_us009_duplicate_request():
+    """US-009: Duplicate request returns existing voucher."""
+    pass

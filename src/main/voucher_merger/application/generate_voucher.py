@@ -1,12 +1,17 @@
 """GenerateVoucher use case - orchestrates voucher generation workflow."""
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from voucher_merger.domain.placeholder_validator import PlaceholderValidator
+from voucher_merger.domain.template import TemplatePlaceholderExtractor
 from voucher_merger.domain.value_objects import BookingRef, CustomerData, ServiceData
 from voucher_merger.ports.document_renderer import DocumentRenderer, MergedContent
 from voucher_merger.ports.template_repository import TemplateRepository
 from voucher_merger.ports.voucher_storage import VoucherStorage
+
+logger = logging.getLogger(__name__)
 
 
 class TemplateNotFoundError(Exception):
@@ -165,6 +170,9 @@ class GenerateVoucher:
         if template is None:
             raise TemplateNotFoundError(request.template_id)
 
+        # 2a. Validate template placeholders (non-blocking)
+        self._validate_placeholders(template.content, request.template_id)
+
         # 3. Merge customer data into template
         merged_html = self._merge_template(template.content, request)
         merged_content = MergedContent(html=merged_html)
@@ -254,3 +262,41 @@ class GenerateVoucher:
         """
         date_str = booking.service_date.strftime("%Y%m%d")
         return f"V-{booking.booking_id}-{date_str}"
+
+    def _validate_placeholders(self, template_content: str, template_id: str) -> None:
+        """Validate template placeholders and log warnings.
+
+        This validation is non-blocking - it logs warnings but allows generation
+        to proceed even with unknown or optional placeholders.
+
+        Args:
+            template_content: Raw template content to validate.
+            template_id: Template identifier for logging context.
+        """
+        extractor = TemplatePlaceholderExtractor()
+        extracted = extractor.extract_placeholders(template_content)
+
+        validator = PlaceholderValidator()
+        result = validator.validate(extracted)
+
+        # Log warnings for unknown placeholders
+        for placeholder in result.unknown_placeholders:
+            suggestion = result.suggestions.get(placeholder)
+            if suggestion:
+                logger.warning(
+                    "Template '%s' contains unknown placeholder '%s'. "
+                    "Did you mean: %s?",
+                    template_id,
+                    placeholder,
+                    suggestion,
+                )
+            else:
+                logger.warning(
+                    "Template '%s' contains unknown placeholder '%s'.",
+                    template_id,
+                    placeholder,
+                )
+
+        # Log warnings for optional field usage
+        for warning in result.warnings:
+            logger.warning("Template '%s': %s", template_id, warning)
