@@ -219,5 +219,31 @@ events:
   s: EXECUTED
   sid: 02-01
   t: '2026-02-18T05:42:31Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 02-01
+  t: '2026-02-18T05:43:26Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 02-02
+  t: '2026-02-18T05:45:09Z'
+- d: 'NOT_APPLICABLE: Domain logic tested via unit tests - placeholder extraction
+    is internal behavior'
+  p: RED_ACCEPTANCE
+  s: SKIPPED
+  sid: 02-02
+  t: '2026-02-18T05:45:27Z'
+- d: PASS
+  p: RED_UNIT
+  s: EXECUTED
+  sid: 02-02
+  t: '2026-02-18T05:46:11Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 02-02
+  t: '2026-02-18T05:46:33Z'
 project_id: voucher-generation
 schema_version: '3.0'
