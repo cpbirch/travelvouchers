@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from voucher_merger.ports.document_renderer import RenderedDocument, RenderedHtmlDocument
-from voucher_merger.ports.voucher_storage import StorageUrl
+from voucher_merger.ports.voucher_storage import StorageError, StorageUrl
 
 
 class FilesystemStorage:
@@ -43,14 +43,22 @@ class FilesystemStorage:
 
         Returns:
             StorageUrl with file:// URL to the stored document.
+
+        Raises:
+            StorageError: If the document cannot be stored due to filesystem errors.
         """
         storage_dir = (
             self._base_path / "vouchers" / self._booking_id / self._service_date
         )
-        storage_dir.mkdir(parents=True, exist_ok=True)
 
-        file_path = storage_dir / "voucher.pdf"
-        file_path.write_bytes(document.content)
+        try:
+            storage_dir.mkdir(parents=True, exist_ok=True)
+            file_path = storage_dir / "voucher.pdf"
+            file_path.write_bytes(document.content)
+        except OSError as e:
+            raise StorageError(
+                f"Failed to store PDF for booking {self._booking_id}: {e}"
+            ) from e
 
         return StorageUrl(url=f"file://{file_path}")
 
@@ -66,13 +74,21 @@ class FilesystemStorage:
 
         Returns:
             StorageUrl with file:// URL to the stored document.
+
+        Raises:
+            StorageError: If the document cannot be stored due to filesystem errors.
         """
         storage_dir = (
             self._base_path / "vouchers" / self._booking_id / self._service_date
         )
-        storage_dir.mkdir(parents=True, exist_ok=True)
 
-        file_path = storage_dir / "voucher.html"
-        file_path.write_text(document.content, encoding="utf-8")
+        try:
+            storage_dir.mkdir(parents=True, exist_ok=True)
+            file_path = storage_dir / "voucher.html"
+            file_path.write_text(document.content, encoding="utf-8")
+        except OSError as e:
+            raise StorageError(
+                f"Failed to store HTML for booking {self._booking_id}: {e}"
+            ) from e
 
         return StorageUrl(url=f"file://{file_path}")

@@ -117,11 +117,20 @@ class GenerateVoucher:
         # 4. Render to email-compatible HTML
         rendered_html = self._document_renderer.render_html(merged_content)
 
-        # 5. Store vouchers (PDF and HTML)
+        # 5. Configure storage with booking context (if supported)
+        # This allows storage factories to create properly configured storage
+        if hasattr(self._voucher_storage, "configure"):
+            service_date_str = request.booking.service_date.strftime("%Y-%m-%d")
+            self._voucher_storage.configure(
+                booking_id=request.booking.booking_id,
+                service_date=service_date_str,
+            )
+
+        # 6. Store vouchers (PDF and HTML)
         pdf_storage_url = self._voucher_storage.store(rendered_document)
         html_storage_url = self._voucher_storage.store_html(rendered_html)
 
-        # 6. Build and return response
+        # 7. Build and return response
         voucher_id = self._generate_voucher_id(request.booking)
         return VoucherResponse(
             voucher_id=voucher_id,

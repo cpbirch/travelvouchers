@@ -18,6 +18,7 @@ from voucher_merger.application.generate_voucher import (
 )
 from voucher_merger.application.validators import validate_voucher_request
 from voucher_merger.domain.value_objects import BookingRef, CustomerData, ServiceData
+from voucher_merger.ports.voucher_storage import StorageError
 
 # =============================================================================
 # Request/Response Models
@@ -124,6 +125,7 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
         responses={
             400: {"model": ValidationErrorResponse, "description": "Validation error"},
             404: {"model": ErrorResponse, "description": "Template not found"},
+            503: {"model": ErrorResponse, "description": "Storage unavailable"},
         },
     )
     async def create_voucher(request: Request) -> Any:
@@ -208,6 +210,17 @@ def create_voucher_router(generate_voucher: GenerateVoucher) -> APIRouter:
                 content={
                     "error": "TEMPLATE_NOT_FOUND",
                     "message": f"Template '{e.template_id}' not found",
+                },
+            )
+        except StorageError:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "error": "STORAGE_UNAVAILABLE",
+                    "message": "Storage service is temporarily unavailable",
+                },
+                headers={
+                    "Retry-After": "60",
                 },
             )
 

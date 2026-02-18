@@ -6,6 +6,16 @@ from typing import Protocol
 from voucher_merger.ports.document_renderer import RenderedDocument, RenderedHtmlDocument
 
 
+class StorageError(Exception):
+    """Raised when storage operations fail.
+
+    This exception indicates that a voucher could not be stored due to
+    infrastructure issues (filesystem errors, network problems, etc.).
+    """
+
+    pass
+
+
 @dataclass(frozen=True)
 class StorageUrl:
     """URL where a voucher document is stored.

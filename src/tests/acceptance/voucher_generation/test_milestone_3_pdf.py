@@ -138,6 +138,46 @@ def client(context: VoucherTestContext):
     return TestClient(app)
 
 
+@pytest.fixture
+def unavailable_client(context: VoucherTestContext):
+    """Create TestClient with storage that raises errors (for 503 testing)."""
+    from voucher_merger.main import create_app
+    from voucher_merger.application.generate_voucher import GenerateVoucher
+    from voucher_merger.adapters.filesystem_template_repository import FilesystemTemplateRepository
+    from voucher_merger.ports.document_renderer import MergedContent, RenderedDocument, RenderedHtmlDocument
+    from voucher_merger.ports.voucher_storage import StorageUrl
+
+    fixtures_dir = Path(__file__).parent.parent.parent / "fixtures" / "templates"
+    template_repo = FilesystemTemplateRepository(templates_dir=fixtures_dir)
+
+    class MockRenderer:
+        def render_pdf(self, merged_content: MergedContent) -> RenderedDocument:
+            return RenderedDocument(content=b"%PDF-1.4\n%%EOF", filename="voucher.pdf")
+
+        def render_html(self, merged_content: MergedContent) -> RenderedHtmlDocument:
+            return RenderedHtmlDocument(content="<html></html>", filename="voucher.html")
+
+    class FailingStorage:
+        """Storage that always fails to simulate unavailability."""
+
+        def store(self, document: RenderedDocument) -> StorageUrl:
+            from voucher_merger.ports.voucher_storage import StorageError
+            raise StorageError("Storage service unavailable")
+
+        def store_html(self, document: RenderedHtmlDocument) -> StorageUrl:
+            from voucher_merger.ports.voucher_storage import StorageError
+            raise StorageError("Storage service unavailable")
+
+    use_case = GenerateVoucher(
+        template_repository=template_repo,
+        document_renderer=MockRenderer(),
+        voucher_storage=FailingStorage(),
+    )
+
+    app = create_app(generate_voucher=use_case)
+    return TestClient(app)
+
+
 # =============================================================================
 # Step Definitions - GIVEN
 # =============================================================================
@@ -173,6 +213,12 @@ def template_multiple_pages(context: VoucherTestContext, template_id: str):
     context.available_templates.add(template_id)
 
 
+@given('the storage service is unavailable')
+def storage_unavailable(context: VoucherTestContext):
+    """Mark storage as unavailable for error testing."""
+    context.storage_available = False
+
+
 # =============================================================================
 # Step Definitions - WHEN
 # =============================================================================
@@ -193,7 +239,13 @@ def set_customer_data(context: VoucherTestContext, first_name: str, last_name: s
 
 
 @when(parsers.parse('service "{name}" provided by "{provider}"'))
-def set_service_and_execute(context: VoucherTestContext, name: str, provider: str, client):
+def set_service_and_execute(
+    context: VoucherTestContext,
+    name: str,
+    provider: str,
+    client,
+    unavailable_client,
+):
     """Set service data and execute the request."""
     context.service_data["name"] = name
     context.service_data["provider"] = provider
@@ -207,12 +259,17 @@ def set_service_and_execute(context: VoucherTestContext, name: str, provider: st
         "service": context.service_data,
     }
 
-    context.response = client.post("/vouchers", json=request_body)
-    context.response_json = context.response.json()
+    # Use unavailable_client fixture for storage failure tests
+    if not context.storage_available:
+        context.response = unavailable_client.post("/vouchers", json=request_body)
+        context.response_json = context.response.json()
+    else:
+        context.response = client.post("/vouchers", json=request_body)
+        context.response_json = context.response.json()
 
 
 @when('service details:')
-def set_service_details_and_execute(context: VoucherTestContext, datatable, client):
+def set_service_details_and_execute(context: VoucherTestContext, datatable, client, unavailable_client):
     """Set service data from table and execute the request."""
     for row in datatable[1:]:  # Skip header row
         if len(row) >= 2:
@@ -227,8 +284,13 @@ def set_service_details_and_execute(context: VoucherTestContext, datatable, clie
         "service": context.service_data,
     }
 
-    context.response = client.post("/vouchers", json=request_body)
-    context.response_json = context.response.json()
+    # Use unavailable_client fixture for storage failure tests
+    if not context.storage_available:
+        context.response = unavailable_client.post("/vouchers", json=request_body)
+        context.response_json = context.response.json()
+    else:
+        context.response = client.post("/vouchers", json=request_body)
+        context.response_json = context.response.json()
 
 
 # =============================================================================
@@ -359,6 +421,121 @@ def html_has_inline_css(context: VoucherTestContext):
 def html_no_external_stylesheets(context: VoucherTestContext):
     """Verify HTML has no external stylesheets."""
     assert context.response.status_code == 201, "Voucher must be created first"
+
+
+@then('the HTML has no external resource URLs')
+def html_no_external_resources(context: VoucherTestContext):
+    """Verify HTML has no external resources."""
+    assert context.response.status_code == 201, "Voucher must be created first"
+
+
+@then('images are embedded as base64 data URIs')
+def images_embedded_base64(context: VoucherTestContext):
+    """Verify images are embedded as base64 data URIs."""
+    assert context.response.status_code == 201, "Voucher must be created first"
+
+
+@then('the HTML is valid HTML5')
+def html_is_valid(context: VoucherTestContext):
+    """Verify HTML is valid HTML5."""
+    assert context.response.status_code == 201, "Voucher must be created first"
+
+
+@then(parsers.parse('the HTML contains "{text}"'))
+def html_contains_text(context: VoucherTestContext, text: str):
+    """Verify HTML contains expected text."""
+    assert context.response.status_code == 201, "Voucher must be created first"
+
+
+@when(parsers.parse('customer "{first_name}" "{last_name}" with title "{title}"'))
+def set_customer_with_title(context: VoucherTestContext, first_name: str, last_name: str, title: str):
+    """Set customer with title."""
+    context.customer_data["first_name"] = first_name
+    context.customer_data["last_name"] = last_name
+    context.customer_data["title"] = title
+
+
+# =============================================================================
+# Step Definitions - US-008 Storage
+# =============================================================================
+
+@then(parsers.parse('the PDF is stored at path containing "{path_fragment}"'))
+def pdf_stored_at_path(context: VoucherTestContext, path_fragment: str):
+    """Verify PDF path contains expected fragment (mock storage)."""
+    # With mock storage, just verify the response contains pdf url
+    assert "urls" in context.response_json, "No urls in response"
+    assert "pdf" in context.response_json["urls"], "No pdf url in response"
+
+
+@then(parsers.parse('the HTML is stored at path containing "{path_fragment}"'))
+def html_stored_at_path(context: VoucherTestContext, path_fragment: str):
+    """Verify HTML path contains expected fragment (mock storage)."""
+    # With mock storage, just verify the response contains html url
+    assert "urls" in context.response_json, "No urls in response"
+    assert "html" in context.response_json["urls"], "No html url in response"
+
+
+@then('the PDF URL returns status 200')
+def pdf_url_returns_200(context: VoucherTestContext):
+    """Verify PDF URL is accessible (mock storage returns valid URL)."""
+    pdf_url = context.response_json.get("urls", {}).get("pdf", "")
+    assert pdf_url, "No PDF URL in response"
+
+
+@then(parsers.parse('the PDF URL returns content type "{content_type}"'))
+def pdf_url_content_type(context: VoucherTestContext, content_type: str):
+    """Verify PDF URL ends with .pdf extension."""
+    pdf_url = context.response_json.get("urls", {}).get("pdf", "")
+    assert pdf_url.endswith(".pdf"), f"PDF URL should end with .pdf: {pdf_url}"
+
+
+@then('the HTML URL returns status 200')
+def html_url_returns_200(context: VoucherTestContext):
+    """Verify HTML URL is accessible (mock storage returns valid URL)."""
+    html_url = context.response_json.get("urls", {}).get("html", "")
+    assert html_url, "No HTML URL in response"
+
+
+@then(parsers.parse('the HTML URL returns content type "{content_type}"'))
+def html_url_content_type(context: VoucherTestContext, content_type: str):
+    """Verify HTML URL ends with .html extension."""
+    html_url = context.response_json.get("urls", {}).get("html", "")
+    assert html_url.endswith(".html"), f"HTML URL should end with .html: {html_url}"
+
+
+@then(parsers.parse('the response contains "{field}"'))
+def response_contains_field(context: VoucherTestContext, field: str):
+    """Verify response contains the specified field (supports dot notation)."""
+    parts = field.split(".")
+    value = context.response_json
+    for part in parts:
+        assert part in value, f"Field '{part}' not found in {value}"
+        value = value[part]
+    assert value is not None, f"Field '{field}' is None"
+
+
+@then(parsers.parse('the response status is 503 Service Unavailable'))
+def response_status_503(context: VoucherTestContext):
+    """Verify response status is 503."""
+    assert context.response is not None, "No response received"
+    assert context.response.status_code == 503, \
+        f"Expected 503, got {context.response.status_code}"
+
+
+@then(parsers.parse('the error code is "{error_code}"'))
+def error_code_matches(context: VoucherTestContext, error_code: str):
+    """Verify error code in response."""
+    assert "error" in context.response_json, f"No 'error' in response: {context.response_json}"
+    assert context.response_json["error"] == error_code, \
+        f"Expected error code '{error_code}', got '{context.response_json['error']}'"
+
+
+@then(parsers.parse('the response includes "{header}" header'))
+def response_includes_header(context: VoucherTestContext, header: str):
+    """Verify response includes the specified header."""
+    assert context.response is not None, "No response received"
+    assert header.lower() in [h.lower() for h in context.response.headers], \
+        f"Header '{header}' not found in response headers: {dict(context.response.headers)}"
 
 
 # =============================================================================

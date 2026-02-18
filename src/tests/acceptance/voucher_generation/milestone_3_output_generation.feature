@@ -166,7 +166,7 @@ Feature: Output Generation and Storage
   # Sprint 3 - Output Generation
   # ============================================================================
 
-  @us-008 @skip
+  @us-008
   Scenario: Store voucher at predictable path
     # The booking service can predict where vouchers are stored based on
     # booking_id and service_date, useful for support retrieval.
@@ -181,7 +181,7 @@ Feature: Output Generation and Storage
     And the PDF is stored at path containing "BK-2024-80001/2024-03-15"
     And the HTML is stored at path containing "BK-2024-80001/2024-03-15"
 
-  @us-008 @skip
+  @us-008
   Scenario: Returned URLs are accessible
     # The URLs returned in the response must actually work when accessed.
     When I request a voucher for:
@@ -197,7 +197,7 @@ Feature: Output Generation and Storage
     And the HTML URL returns status 200
     And the HTML URL returns content type "text/html"
 
-  @us-008 @skip
+  @us-008
   Scenario: Response includes both PDF and HTML URLs
     # Every successful voucher generation returns URLs for both formats.
     When I request a voucher for:
@@ -211,7 +211,7 @@ Feature: Output Generation and Storage
     And the response contains "urls.pdf"
     And the response contains "urls.html"
 
-  @us-008 @skip
+  @us-008
   Scenario: Storage unavailable returns 503 with retry guidance
     # When storage is down, the API returns 503 with Retry-After header so the booking service knows when to retry.
     Given the storage service is unavailable
