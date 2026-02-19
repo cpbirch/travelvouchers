@@ -1,0 +1,7 @@
+[cosmic-ray]
+module-path = "src/main/voucher_merger"
+timeout = 60.0
+test-command = "python -m pytest src/tests/unit/ src/tests/acceptance/ -x -q --tb=no"
+
+[cosmic-ray.distributor]
+name = "local"
