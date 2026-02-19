@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "voucher-merger"
 version = "0.1.0"
 description = "Template merger service for generating vouchers from DOCX/ODT templates"
-# readme = "README.md"  # Uncomment when README exists
+readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
