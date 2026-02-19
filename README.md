@@ -59,3 +59,10 @@ docs/                      # Architecture decisions, research, analysis
 Makefile                   # Developer task runner
 pyproject.toml             # Project configuration and dependencies
 ```
+
+## Claude.ai spec driven development using nWave
+
+Not a single line of code was written by a person.  Instead, the entire project was developed using a spec-driven 
+approach with nWave and Claude.ai.  Based on a simple single sentence product description.
+
+If you fork and evolve this, install https://nwave.ai/ and use the `nwave` Claude CLI tool.
