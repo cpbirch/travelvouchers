@@ -81,3 +81,8 @@ def create_app(
     app.include_router(router)
 
     return app
+
+
+# Module-level app instance for uvicorn and tooling that expects `module:app`.
+# For dependency injection (e.g. tests), call create_app() directly.
+app = create_app()
